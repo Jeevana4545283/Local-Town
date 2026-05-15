@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-zinc-50 text-zinc-900 antialiased;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      Inter,
+      Arial,
+      'Noto Sans',
+      'Apple Color Emoji',
+      'Segoe UI Emoji';
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply border border-white/10 bg-white/10 shadow-glass backdrop-blur-xl;
+  }
+  .glass-strong {
+    @apply border border-white/10 bg-white/15 shadow-glass backdrop-blur-2xl;
+  }
+  .ring-soft {
+    @apply ring-1 ring-white/10;
+  }
+}
+
