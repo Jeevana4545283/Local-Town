@@ -9,6 +9,10 @@ export const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('lt_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
+  
+  // Add localtunnel bypass header
+  config.headers['Bypass-Tunnel-Reminder'] = 'true'
+  
   return config
 })
 
