@@ -5,13 +5,17 @@ import App from './App'
 import './index.css'
 import { ThemeProvider } from './lib/theme'
 
+import { GoogleOAuthProvider } from '@react-oauth/google'
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </ThemeProvider>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID'}>
+      <ThemeProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </ThemeProvider>
+    </GoogleOAuthProvider>
   </React.StrictMode>,
 )
 

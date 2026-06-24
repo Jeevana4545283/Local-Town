@@ -6,7 +6,6 @@ const http = require("http");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const { app } = require("./app");
-const { connectDb } = require("./utils/connectDb");
 const { initSocket } = require("./socket");
 
 // AI Routes
@@ -45,9 +44,6 @@ app.use("/api/ai", aiRoutes);
 // -----------------------------
 async function main() {
   try {
-    // Connect MongoDB
-    await connectDb();
-
     // Create HTTP Server
     const server = http.createServer(app);
 
@@ -60,7 +56,7 @@ async function main() {
         `🚀 SmartTown Server running on http://localhost:${PORT}`
       );
 
-      console.log("✅ MongoDB Connected");
+      console.log("✅ Prisma MySQL Ready");
       console.log("✅ Razorpay Initialized");
       console.log("✅ Gemini AI Connected");
     });

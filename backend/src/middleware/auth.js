@@ -1,5 +1,5 @@
 const { verifyJwt } = require('../utils/jwt')
-const { User } = require('../models/User')
+const prisma = require('../prisma')
 
 async function requireAuth(req, res, next) {
   const header = req.headers.authorization || ''
@@ -8,11 +8,25 @@ async function requireAuth(req, res, next) {
 
   try {
     const decoded = verifyJwt(token)
-    const user = await User.findById(decoded.sub).select('-passwordHash')
+    
+    // Check if it's an Owner
+    let user = await prisma.owner.findUnique({
+      where: { id: decoded.userId }
+    })
+    
+    if (!user) {
+      user = await prisma.user.findUnique({
+        where: { id: decoded.userId }
+      })
+    }
+    
     if (!user) return res.status(401).json({ message: 'Unauthorized' })
-    req.user = user
+    
+    // Remove password before attaching to req
+    const { password, passwordHash, ...userWithoutPassword } = user
+    req.user = userWithoutPassword
     next()
-  } catch {
+  } catch (err) {
     return res.status(401).json({ message: 'Unauthorized' })
   }
 }
@@ -28,4 +42,3 @@ function requireRole(...roles) {
 }
 
 module.exports = { requireAuth, requireRole }
-

@@ -1,121 +1,113 @@
 const express = require('express')
 const { z } = require('zod')
 const { requireAuth } = require('../middleware/auth')
-const { RentalListing } = require('../models/RentalListing')
+const prisma = require('../prisma')
 
 const router = express.Router()
 
+// GET /api/rentals (Public: All rentals for users)
 router.get('/', async (req, res, next) => {
   try {
-    const page = Math.max(1, Number(req.query.page || 1))
-    const limit = Math.min(50, Math.max(1, Number(req.query.limit || 12)))
-    const q = (req.query.q || '').toString().trim()
-
-    const filter = { isActive: true }
-    if (q) filter.$text = { $search: q }
-
-    const [items, total] = await Promise.all([
-      RentalListing.find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .populate('owner', 'name phone'),
-      RentalListing.countDocuments(filter),
-    ])
-
-    res.json({ items, page, limit, total })
+    const rentals = await prisma.rental.findMany({
+      include: {
+        owner: {
+          select: { name: true, email: true }
+        }
+      }
+    })
+    rentals.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    res.json({ items: rentals })
   } catch (err) {
     next(err)
   }
 })
 
-router.get('/:id', async (req, res, next) => {
+// GET /api/rentals/my (Private: Owner's rentals)
+router.get('/my', requireAuth, async (req, res, next) => {
   try {
-    const item = await RentalListing.findById(req.params.id).populate('owner', 'name phone')
-    if (!item) return res.status(404).json({ message: 'Not found' })
-    res.json({ item })
+    const rentals = await prisma.rental.findMany({
+      where: { ownerId: req.user.id }
+    })
+    rentals.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    res.json({ items: rentals })
   } catch (err) {
     next(err)
   }
 })
 
+// POST /api/rentals (Private: Create Rental)
 router.post('/', requireAuth, async (req, res, next) => {
   try {
-    const body = z
-      .object({
-        title: z.string().min(3),
-        description: z.string().optional(),
-        kind: z.enum(['house', 'room']),
-        address: z.string().optional(),
-        location: z
-          .object({ lng: z.number(), lat: z.number() })
-          .optional(),
-        rentPerMonth: z.number().min(0),
-        deposit: z.number().min(0).optional(),
-        bedrooms: z.number().min(0).optional(),
-        bathrooms: z.number().min(0).optional(),
-        furnished: z.boolean().optional(),
-        images: z.array(z.string()).optional(),
-      })
-      .parse(req.body)
+    const body = z.object({
+      title: z.string().min(3),
+      address: z.string().min(5),
+      pincode: z.number().int().positive(),
+      nearbyAreas: z.array(z.string()).nonempty(),
+      rentPrice: z.number().positive(),
+      phoneNumber: z.string().min(10),
+      description: z.string().min(5),
+      imageUrls: z.array(z.string()).nonempty(),
+      latitude: z.number(),
+      longitude: z.number(),
+      status: z.string().optional()
+    }).parse(req.body)
 
-    const item = await RentalListing.create({
-      owner: req.user._id,
-      title: body.title,
-      description: body.description,
-      kind: body.kind,
-      address: body.address,
-      location: body.location
-        ? { type: 'Point', coordinates: [body.location.lng, body.location.lat] }
-        : undefined,
-      rentPerMonth: body.rentPerMonth,
-      deposit: body.deposit || 0,
-      bedrooms: body.bedrooms || 0,
-      bathrooms: body.bathrooms || 0,
-      furnished: body.furnished || false,
-      images: body.images || [],
+    const payload = {
+      ...body,
+      status: body.status || 'Available',
+      ownerId: req.user.id
+    }
+
+    const rental = await prisma.rental.create({
+      data: payload
     })
 
-    res.status(201).json({ item })
+    res.status(201).json({ item: rental })
   } catch (err) {
     next(err)
   }
 })
 
-router.patch('/:id', requireAuth, async (req, res, next) => {
+// PUT /api/rentals/:id (Private: Update Rental)
+router.put('/:id', requireAuth, async (req, res, next) => {
   try {
-    const item = await RentalListing.findById(req.params.id)
-    if (!item) return res.status(404).json({ message: 'Not found' })
-    if (item.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Forbidden' })
-    }
+    const rental = await prisma.rental.findUnique({ where: { id: req.params.id } })
+    if (!rental) return res.status(404).json({ message: 'Not found' })
+    if (rental.ownerId !== req.user.id) return res.status(403).json({ message: 'Forbidden' })
 
-    const body = z
-      .object({
-        title: z.string().min(3).optional(),
-        description: z.string().optional(),
-        address: z.string().optional(),
-        isActive: z.boolean().optional(),
-        images: z.array(z.string()).optional(),
-      })
-      .parse(req.body)
+    const body = z.object({
+      title: z.string().min(3).optional(),
+      address: z.string().min(5).optional(),
+      pincode: z.number().int().positive().optional(),
+      nearbyAreas: z.array(z.string()).optional(),
+      rentPrice: z.number().positive().optional(),
+      phoneNumber: z.string().min(10).optional(),
+      description: z.string().min(5).optional(),
+      imageUrls: z.array(z.string()).optional(),
+      latitude: z.number().optional(),
+      longitude: z.number().optional(),
+      status: z.string().optional()
+    }).parse(req.body)
 
-    Object.assign(item, body)
-    await item.save()
-    res.json({ item })
+    const updated = await prisma.rental.update({
+      where: { id: req.params.id },
+      data: body
+    })
+
+    res.json({ item: updated })
   } catch (err) {
     next(err)
   }
 })
 
+// DELETE /api/rentals/:id (Private: Delete Rental)
 router.delete('/:id', requireAuth, async (req, res, next) => {
   try {
-    const item = await RentalListing.findById(req.params.id)
-    if (!item) return res.status(404).json({ message: 'Not found' })
-    if (item.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Forbidden' })
-    }
-    await item.deleteOne()
+    const rental = await prisma.rental.findUnique({ where: { id: req.params.id } })
+    if (!rental) return res.status(404).json({ message: 'Not found' })
+    if (rental.ownerId !== req.user.id) return res.status(403).json({ message: 'Forbidden' })
+
+    await prisma.rental.delete({ where: { id: req.params.id } })
     res.json({ ok: true })
   } catch (err) {
     next(err)
@@ -123,4 +115,3 @@ router.delete('/:id', requireAuth, async (req, res, next) => {
 })
 
 module.exports = router
-

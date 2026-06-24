@@ -1,299 +1,487 @@
-import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Calendar, MapPin, Users, Sparkles, Heart, X,
-  ArrowUpRight, Search, Zap, Globe, ShieldCheck,
-  CheckCircle2, Camera, Ticket
-} from 'lucide-react'
-import { api } from '../lib/api'
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Search, MapPin, Star, Heart, 
+  Calendar, X, Loader2, CheckCircle,
+  ArrowUpRight, ShieldCheck, Camera,
+  Music, Clock, Users, Plus, ChevronLeft
+} from 'lucide-react';
 
-
-// --- Types ---
-type EventItem = { 
-  _id: string; 
-  title: string; 
-  startsAt: string; 
-  venue: string; 
-  description: string;
-  category: string;
-  attendees: number;
-  image: string;
-  price: string;
+// --- Enhanced Types ---
+interface Event {
+  id: string;
+  title: string;
+  price: number;
+  city: string;
+  street: string;
+  category: 'Music' | 'Tech' | 'Sports' | 'Social' | 'Arts';
+  type: 'Free' | 'Paid';
+  nearby: string[];
+  rating: number;
+  reviewsCount: number;
+  img: string[];
+  desc: string;
+  isBooked: boolean;
+  isVerified: boolean;
+  amenities: string[];
 }
+
+
+import { useEffect } from 'react';
 
 export function EventsPage() {
-  const [items, setItems] = useState<EventItem[]>([])
-  const [filter, setFilter] = useState('All')
-  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null)
-  const [isHostModalOpen, setIsHostModalOpen] = useState(false)
-  const [likedEvents, setLikedEvents] = useState<string[]>([])
+  const [properties, setProperties] = useState<Event[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<Event | null>(null);
+  const [isPaying, setIsPaying] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
 
-  async function refreshEvents() {
-    try {
-      const r = await api.get('/events')
-      // backend returns: { items }
-      const data = r.data?.items || []
-      setItems(data as any)
-    } catch {
-      // keep existing UI fallback if backend fails
+  // --- Booking Form State ---
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [bookingData, setBookingData] = useState({ name: '', phone: '', date: '', message: '' });
+  const [isBooking, setIsBooking] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const getUserId = () => {
+    let id = localStorage.getItem('lt_guest_id')
+    if (!id) {
+      id = 'guest-' + Math.random().toString(36).substr(2, 9)
+      localStorage.setItem('lt_guest_id', id)
     }
+    return id
   }
+
+  const navigate = useNavigate();
+
+  // --- Advanced Filter State ---
+  const [filters, setFilters] = useState({
+    city: 'All',
+    category: 'All',
+    type: 'All',
+  });
 
   useEffect(() => {
-    void refreshEvents()
-  }, [])
+    fetch('http://localhost:4000/api/events')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.items) {
+          const mapped: Event[] = data.items.map((e: any) => ({
+            id: e.id,
+            title: e.title || 'Unknown Event',
+            price: e.ticketPrice || 0,
+            city: e.address?.split(',')[0] || 'Unknown',
+            street: e.address || '',
+            category: 'Social',
+            type: e.ticketPrice > 0 ? 'Paid' : 'Free',
+            nearby: e.nearbyAreas || [],
+            rating: 4.8,
+            reviewsCount: Math.floor(Math.random() * 50) + 10,
+            img: e.imageUrls?.length ? e.imageUrls : ['https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80'],
+            desc: e.description || 'Great event.',
+            isBooked: e.status !== 'Upcoming',
+            isVerified: true,
+            amenities: []
+          }));
+          setProperties(mapped);
+        }
+      })
+      .catch((err) => console.error("Failed to load events:", err))
+      .finally(() => setLoading(false));
+  }, []);
 
+  // --- Smart Search & Filtering Logic ---
+  const filteredProperties = useMemo(() => {
+    return properties.filter(p => {
+      const matchesSearch = 
+        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.street.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.nearby.some(n => n.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const matchesCity = filters.city === 'All' || p.city === filters.city;
+      const matchesCategory = filters.category === 'All' || p.category === filters.category;
+      const matchesType = filters.type === 'All' || p.type === filters.type;
 
-  const categories = ['All', 'Music', 'Tech', 'Sports', 'Social']
-  const filteredItems = filter === 'All' ? items : items.filter(i => i.category === filter)
+      return matchesSearch && matchesCity && matchesCategory && matchesType;
+    });
+  }, [properties, searchQuery, filters]);
 
-  const toggleLike = (id: string) => {
-    setLikedEvents(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
-  }
+  // --- Functions ---
+  const toggleFavorite = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  };
 
-  return (
-    <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-indigo-100">
-      {/* --- Dynamic Header --- */}
-      <header className="relative h-[60vh] w-full overflow-hidden bg-zinc-900 flex items-center justify-center text-center px-6">
-        <div className="absolute inset-0 opacity-40 bg-[url('https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=2000')] bg-cover bg-center" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-zinc-900/50 to-white" />
-        
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 max-w-4xl">
-          <span className="inline-block px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-white text-xs font-bold tracking-widest uppercase mb-6 border border-white/20">
-            Exclusive Community Events
-          </span>
-          <h1 className="text-6xl md:text-8xl font-medium tracking-tighter text-white mb-8">
-            Live the <span className="italic font-serif">Moment.</span>
-          </h1>
-          <div className="flex flex-wrap justify-center gap-4">
-            <button className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/25">Explore Nearby</button>
-            <button onClick={() => setIsHostModalOpen(true)} className="bg-white text-zinc-900 px-8 py-4 rounded-2xl font-bold hover:bg-zinc-100 transition-all">Host Experience</button>
-          </div>
-        </motion.div>
-      </header>
-
-      {/* --- Main Content --- */}
-      <main className="max-w-7xl mx-auto px-6 -mt-20 relative z-20 pb-20">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
-          {[{ icon: <Zap size={20}/>, label: "Fast Booking", sub: "Confirmed in seconds" },
-            { icon: <Globe size={20}/>, label: "Local Vibes", sub: "Verified organizers" },
-            { icon: <ShieldCheck size={20}/>, label: "Secure Pay", sub: "100% refund policy" }].map((stat, i) => (
-            <div key={stat.label || `stat-${i}`} className="bg-white/80 backdrop-blur-md border border-zinc-200 p-6 rounded-3xl flex items-center gap-4 shadow-xl shadow-zinc-200/50">
-              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">{stat.icon}</div>
-              <div><p className="font-bold text-zinc-900">{stat.label}</p><p className="text-xs text-zinc-500">{stat.sub}</p></div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-            {categories.map(cat => (
-              <button key={cat} onClick={() => setFilter(cat)} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all ${filter === cat ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}>
-                {cat}
-              </button>
-            ))}
-          </div>
-          <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-indigo-600 transition-colors" size={18}/>
-            <input type="text" placeholder="Search events..." className="pl-12 pr-6 py-3 rounded-2xl bg-zinc-100 border-none focus:ring-2 focus:ring-indigo-500 w-full md:w-64 outline-none transition-all" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredItems.map(event => (
-            <motion.div layout key={event._id} onClick={() => setSelectedEvent(event)} className="group cursor-pointer bg-white rounded-[2.5rem] overflow-hidden border border-zinc-100 hover:shadow-2xl transition-all">
-              <div className="relative h-72 overflow-hidden">
-                <img src={event.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="" />
-                <div className="absolute top-6 left-6 flex gap-2">
-                  <span className="bg-white/90 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">{event.category}</span>
-                  <span className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">{event.price}</span>
-                </div>
-              </div>
-              <div className="p-8">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-2xl font-bold leading-tight group-hover:text-indigo-600 transition-colors">{event.title}</h3>
-                  <ArrowUpRight className="text-zinc-300 group-hover:text-indigo-600 transition-all" />
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-zinc-500 font-medium"><MapPin size={16} className="text-indigo-500"/> {event.venue}</div>
-                  <div className="flex items-center gap-2 text-sm text-zinc-500 font-medium"><Users size={16} className="text-indigo-500"/> {event.attendees}+ attending</div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </main>
-
-      {/* --- Overlays & Modals --- */}
-      <AnimatePresence>
-        {selectedEvent && (
-          <EventDetailModal 
-            event={selectedEvent} 
-            onClose={() => setSelectedEvent(null)} 
-            isLiked={likedEvents.includes(selectedEvent._id)}
-            onLike={() => toggleLike(selectedEvent._id)}
-          />
-        )}
-        {isHostModalOpen && (
-          <HostEventModal
-            onClose={() => setIsHostModalOpen(false)}
-            onSaved={() => {
-              setIsHostModalOpen(false)
-              void refreshEvents()
-            }}
-          />
-        )}
-
-      </AnimatePresence>
-    </div>
-  )
-}
-
-// --- Sub-Component: Detail View ---
-function EventDetailModal({ event, onClose, isLiked, onLike }: any) {
-  const [isBooked, setIsBooked] = useState(false);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-zinc-950/60 backdrop-blur-md" />
-      <motion.div layoutId={`card-${event._id}`} className="relative h-full max-h-[85vh] w-full max-w-5xl overflow-hidden rounded-[3rem] bg-white shadow-2xl flex flex-col md:flex-row">
-        <div className="relative h-64 md:h-auto md:w-1/2">
-          <img src={event.image} className="h-full w-full object-cover" alt="" />
-          <button onClick={onClose} className="absolute left-6 top-6 rounded-full bg-white/20 p-2 text-white backdrop-blur-xl hover:bg-white/40 transition-colors"><X/></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-10 md:p-14">
-          {!isBooked ? (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <div className="flex items-center gap-2 mb-4 text-indigo-600">
-                <Sparkles size={16} /> <span className="text-xs font-black uppercase tracking-widest">{event.category}</span>
-              </div>
-              <h2 className="text-5xl font-bold tracking-tight mb-8 leading-tight">{event.title}</h2>
-              <div className="grid grid-cols-2 gap-6 mb-10">
-                <div className="flex items-center gap-4">
-                  <div className="p-4 bg-zinc-100 rounded-2xl"><Calendar className="text-indigo-600" /></div>
-                  <div><p className="text-xs text-zinc-400 font-bold uppercase tracking-tighter">Date</p><p className="font-bold">{event.startsAt}</p></div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="p-4 bg-zinc-100 rounded-2xl"><MapPin className="text-indigo-600" /></div>
-                  <div><p className="text-xs text-zinc-400 font-bold uppercase tracking-tighter">Location</p><p className="font-bold">{event.venue}</p></div>
-                </div>
-              </div>
-              <p className="text-xl text-zinc-500 leading-relaxed mb-12">{event.description}</p>
-              <div className="flex gap-4">
-                <button onClick={onLike} className={`p-5 rounded-2xl border-2 transition-all ${isLiked ? 'bg-red-50 border-red-500 text-red-500' : 'border-zinc-100 text-zinc-400'}`}>
-                  <Heart className={isLiked ? 'fill-current' : ''} />
-                </button>
-                <button onClick={() => setIsBooked(true)} className="flex-1 bg-zinc-900 text-white rounded-2xl font-bold py-5 hover:bg-indigo-600 transition-colors flex items-center justify-center gap-2">
-                  <Ticket size={20}/> Get Ticket — {event.price}
-                </button>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="h-full flex flex-col items-center justify-center text-center">
-              <div className="p-6 bg-emerald-100 text-emerald-600 rounded-full mb-6"><CheckCircle2 size={48} /></div>
-              <h3 className="text-4xl font-bold mb-4">You're going!</h3>
-              <p className="text-zinc-500 mb-10">We've added {event.title} to your schedule. Check your email for the digital pass.</p>
-              <button onClick={onClose} className="px-10 py-4 bg-zinc-900 text-white rounded-full font-bold">Finish</button>
-            </motion.div>
-          )}
-        </div>
-      </motion.div>
-    </div>
-  )
-}
-
-// --- Sub-Component: Host Event Form ---
-function HostEventModal({ onClose, onSaved }: any) {
-  const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('Music')
-  const [description, setDescription] = useState('')
-  const [startsAt, setStartsAt] = useState('')
-  const [venue, setVenue] = useState('')
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  const handleBookingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProperty) return;
+    
+    setIsBooking(true);
     try {
-      // backend expects: title, description?, startsAt(datetime), endsAt?, venue?, organizerName?, contactPhone?
-      // keep category from UI but backend doesn't have it; store into description if needed.
-      const payload: any = {
-        title: title.trim(),
-        description: (description || '').trim() || undefined,
-        startsAt: startsAt || new Date().toISOString(),
-        venue: (venue || '').trim() || undefined,
-        organizerName: undefined,
-        contactPhone: undefined,
+      const res = await fetch('http://localhost:4000/api/events-bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: selectedProperty.id,
+          userName: bookingData.name || 'Guest',
+          userPhone: bookingData.phone || '0000000000',
+          visitDate: bookingData.date || new Date().toISOString(),
+          message: bookingData.message,
+          userId: getUserId()
+        })
+      });
+      if (res.ok) {
+        setPaymentSuccess(true);
+        setShowBookingForm(false);
       }
-
-      // Append category to description to retain info without schema change
-      if (category && payload.description) payload.description = `${payload.description}\n\nCategory: ${category}`
-      if (category && !payload.description) payload.description = `Category: ${category}`
-
-      await api.post('/events', payload)
-      onSaved?.()
-    } catch {
-      // no UI redesign; keep silent failure to avoid layout changes
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsBooking(false);
     }
-  }
+  };
 
   return (
+    <div className="relative h-screen w-screen overflow-hidden bg-zinc-950 font-sans text-white">
+      
+      {/* --- PREMIUM BACKGROUND --- */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900" />
+        <div className="absolute -left-32 -top-32 size-[40rem] rounded-full bg-cyan-500/20 blur-[100px]" />
+        <div className="absolute -right-32 bottom-0 size-[40rem] rounded-full bg-purple-500/20 blur-[100px]" />
+        <div className="absolute left-1/3 top-1/2 size-[30rem] -translate-y-1/2 rounded-full bg-indigo-500/10 blur-[100px]" />
+      </div>
 
-    <div className="fixed inset-0 z-50 flex items-center justify-end">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-zinc-950/40 backdrop-blur-sm" />
-      <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="relative h-full w-full max-w-xl bg-white p-12 shadow-2xl overflow-y-auto">
-        <button onClick={onClose} className="mb-12 text-zinc-400 hover:text-zinc-900 flex items-center gap-2 font-bold"><X size={20}/> Cancel</button>
-        <h2 className="text-5xl font-bold tracking-tighter mb-4 italic font-serif">Host</h2>
-        <h2 className="text-5xl font-bold tracking-tighter mb-12">New Experience</h2>
-        <form className="space-y-8" onSubmit={onSubmit}>
-          <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Event Title</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              type="text"
-              placeholder="e.g. Rooftop Movie Night"
-              className="w-full border-b-2 border-zinc-100 py-4 outline-none focus:border-indigo-600 transition-colors text-xl font-medium"
-            />
+      {/* --- MAIN GLASS CONTAINER --- */}
+      <div className="relative z-10 flex h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] m-4 overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] backdrop-blur-2xl">
+        
+        {/* --- LEFT SIDEBAR --- */}
+        <aside className="flex w-[260px] flex-col border-r border-white/10 bg-black/20 p-6">
+          <div className="mb-10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg">
+                <Calendar size={18} />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-white">LocalTown</span>
+            </div>
+            <button onClick={() => navigate(-1)} className="grid size-8 place-items-center rounded-full bg-white/5 hover:bg-white/10 transition">
+              <ChevronLeft size={18} className="text-zinc-300" />
+            </button>
           </div>
-          <div className="grid grid-cols-2 gap-8">
-            <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Date</label>
-              <input
-                type="date"
-                value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
-                className="w-full border-b-2 border-zinc-100 py-4 outline-none focus:border-indigo-600"
-              /></div>
-            <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Category</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full border-b-2 border-zinc-100 py-4 outline-none focus:border-indigo-600 bg-transparent"
-              ><option>Music</option><option>Tech</option><option>Social</option></select></div>
-          </div>
-          <div className="space-y-2"><label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              placeholder="Tell us about the vibe..."
-              className="w-full border-b-2 border-zinc-100 py-4 outline-none focus:border-indigo-600 resize-none"
-            ></textarea>
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Venue</label>
-            <input
-              value={venue}
-              onChange={(e) => setVenue(e.target.value)}
-              type="text"
-              placeholder="e.g. Silicon Tower"
-              className="w-full border-b-2 border-zinc-100 py-4 outline-none focus:border-indigo-600 transition-colors text-xl font-medium"
-            />
-          </div>
-          <div className="border-2 border-dashed border-zinc-200 rounded-[2rem] p-10 text-center hover:border-indigo-600 hover:bg-indigo-50/50 cursor-pointer transition-all group">
-            <Camera className="mx-auto mb-3 text-zinc-300 group-hover:text-indigo-600" size={32} /><p className="text-xs font-bold text-zinc-400">Upload Hero Image</p>
-          </div>
-          <button type="submit" className="w-full py-6 bg-indigo-600 text-white rounded-[2rem] font-bold text-lg shadow-xl shadow-indigo-500/30 hover:scale-[1.02] active:scale-95 transition-all">Launch Event</button>
-        </form>
 
-      </motion.div>
+          {/* Filters Sidebar */}
+          <div className="flex flex-1 flex-col gap-8 overflow-y-auto custom-scrollbar pr-2 mt-4">
+            
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Event Type</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Music', 'Tech', 'Sports', 'Social', 'Arts'].map(c => (
+                  <label key={c} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, category: c})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.category === c ? 'border-cyan-500 bg-cyan-500/20 text-cyan-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.category === c && <div className="size-2.5 rounded-sm bg-cyan-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.category === c ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{c}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Pricing</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Free', 'Paid'].map(t => (
+                  <label key={t} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, type: t})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.type === t ? 'border-indigo-500 bg-indigo-500/20 text-indigo-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.type === t && <div className="size-2.5 rounded-sm bg-indigo-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.type === t ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{t === 'All' ? 'Any' : t}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+          <button 
+            onClick={() => setShowAddForm(true)}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:scale-105"
+          >
+            <Plus size={18}/> Host Event
+          </button>
+        </aside>
+
+        {/* --- RIGHT CONTENT AREA --- */}
+        <main className="flex flex-1 flex-col overflow-y-auto custom-scrollbar relative">
+          
+          <header className="sticky top-0 z-50 border-b border-white/10 bg-white/5 backdrop-blur-xl px-8 py-6 flex flex-col md:flex-row gap-6 md:items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-black text-white">Find local events</h1>
+              <p className="mt-1 text-sm font-medium text-zinc-400">Discover happenings in your area.</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10 w-[300px]">
+                <Search size={18} className="text-zinc-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search festivals, tech..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent text-sm font-medium text-white placeholder-zinc-500 outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10">
+                <MapPin size={18} className="text-zinc-400" />
+                <select 
+                  onChange={(e) => setFilters({...filters, city: e.target.value})}
+                  className="w-[120px] bg-transparent text-sm font-medium text-white outline-none appearance-none"
+                >
+                  <option className="bg-zinc-900" value="All">All Cities</option>
+                  <option className="bg-zinc-900" value="Hyderabad">Hyderabad</option>
+                  <option className="bg-zinc-900" value="Bangalore">Bangalore</option>
+                  <option className="bg-zinc-900" value="Pune">Pune</option>
+                </select>
+              </div>
+            </div>
+          </header>
+
+          <div className="p-8">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex gap-4">
+                {['Upcoming', 'Popular', 'This Weekend'].map((tab, i) => (
+                  <span key={tab} className={`text-sm font-bold cursor-pointer transition-colors ${i === 0 ? 'text-cyan-400 border-b-2 border-cyan-400 pb-1' : 'text-zinc-500 hover:text-zinc-300'}`}>{tab}</span>
+                ))}
+              </div>
+              <p className="text-sm font-medium text-zinc-500">{filteredProperties.length} Events Found</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredProperties.map((p, idx) => (
+                <motion.div 
+                  key={p.id} 
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.05 }}
+                  whileHover={{ y: -8 }}
+                  onClick={() => { setSelectedProperty(p); setPaymentSuccess(false); setActiveImgIdx(0); }}
+                  className={`group relative flex flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-md cursor-pointer transition-all hover:bg-white/10 hover:shadow-cyan-500/10 ${p.isBooked ? 'opacity-60' : ''}`}
+                >
+                  <div className="relative h-64 overflow-hidden">
+                    <img src={p.img[0]} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    
+                    <div className="absolute left-4 top-4 flex flex-col gap-2">
+                      {p.isBooked && <span className="rounded-full bg-red-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm">Sold Out</span>}
+                      {p.isVerified && <span className="flex items-center gap-1 rounded-full bg-cyan-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm"><ShieldCheck size={12}/> Verified</span>}
+                    </div>
+
+                    <div className="absolute right-4 top-4">
+                      <button 
+                        onClick={(e) => toggleFavorite(e, p.id)}
+                        className={`grid size-10 place-items-center rounded-full backdrop-blur-md transition-all border border-white/20 ${favorites.includes(p.id) ? 'bg-red-500/90 text-white' : 'bg-black/40 text-white hover:bg-black/60'}`}
+                      >
+                        <Heart size={18} fill={favorites.includes(p.id) ? "currentColor" : "none"} />
+                      </button>
+                    </div>
+
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h3 className="text-xl font-bold leading-tight text-white">{p.title}</h3>
+                      <p className="mt-1 flex items-center gap-1 text-sm font-medium text-zinc-300">
+                        <MapPin size={14} className="text-cyan-400" /> {p.street}, {p.city}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-6">
+                    <div className="mb-6 flex items-center justify-between">
+                      <div className="flex flex-wrap gap-2">
+                        {p.amenities.slice(0,3).map(a => (
+                          <span key={a} className="rounded-lg bg-white/10 px-2 py-1 text-[10px] font-bold text-zinc-300 border border-white/5">{a}</span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-xs font-bold text-yellow-400 border border-white/5">
+                        <Star size={12} fill="currentColor" /> {p.rating}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto flex items-end justify-between border-t border-white/10 pt-4">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Entry</p>
+                        <div className="text-2xl font-black text-white">{p.price === 0 ? 'Free' : `₹${p.price}`}</div>
+                      </div>
+                      <button className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg transition-transform group-hover:scale-110">
+                        <ArrowUpRight size={22} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* --- ADD EVENT MODAL --- */}
+      <AnimatePresence>
+        {showAddForm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[3rem] p-10 w-full max-w-lg relative shadow-2xl">
+              <button onClick={() => setShowAddForm(false)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors"><X size={24}/></button>
+              <h2 className="text-3xl font-black mb-2">Host an Event</h2>
+              <p className="text-zinc-400 text-sm mb-8 font-medium">Join 500+ premium organizers today.</p>
+              
+              <div className="space-y-4">
+                <div className="h-32 border-2 border-dashed border-white/20 bg-white/5 rounded-3xl flex flex-col items-center justify-center text-zinc-400 hover:border-cyan-400 hover:text-cyan-400 transition-colors cursor-pointer group">
+                  <Camera size={28} className="mb-2" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Drop Event Banner</span>
+                </div>
+                <input type="text" placeholder="Event Title" className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
+                <div className="flex gap-4">
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Hyderabad</option>
+                    <option>Bangalore</option>
+                  </select>
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Music</option>
+                    <option>Tech</option>
+                  </select>
+                </div>
+                <div className="flex gap-4">
+                  <input type="number" placeholder="Ticket Price (₹)" className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
+                </div>
+                <button className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-2xl font-bold uppercase tracking-widest mt-4 hover:shadow-lg hover:shadow-cyan-500/20 transition-all">Create Event</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- DETAILED BOOKING MODAL --- */}
+      <AnimatePresence>
+        {selectedProperty && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xl">
+            <motion.div 
+              layoutId={selectedProperty.id} 
+              className="bg-zinc-900 border border-white/10 rounded-[2.5rem] w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl relative"
+            >
+              <button onClick={() => setSelectedProperty(null)} className="absolute top-4 right-4 z-50 grid size-10 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md md:hidden"><X size={18}/></button>
+
+              <div className="md:w-1/2 relative bg-black">
+                <img src={selectedProperty.img[activeImgIdx]} className="w-full h-full object-cover opacity-90" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-zinc-900/50 hidden md:block" />
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
+                  {selectedProperty.img.map((img, i) => (
+                    <button key={i} onClick={() => setActiveImgIdx(i)} className={`h-1.5 rounded-full transition-all ${activeImgIdx === i ? 'w-8 bg-cyan-400' : 'w-2 bg-white/40'}`} />
+                  ))}
+                </div>
+              </div>
+
+              <div className="md:w-1/2 flex flex-col p-8 overflow-y-auto custom-scrollbar bg-zinc-900/90 relative">
+                <button onClick={() => setSelectedProperty(null)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors hidden md:block"><X size={24}/></button>
+                
+                <div className="flex gap-3 mb-4">
+                  <span className="rounded-full bg-cyan-500/20 text-cyan-400 px-3 py-1 text-[10px] font-black uppercase tracking-widest border border-cyan-500/30">Registrations Open</span>
+                </div>
+                
+                <h2 className="text-3xl font-black tracking-tight mb-2">{selectedProperty.title}</h2>
+                <div className="flex items-center gap-2 text-sm text-zinc-400 font-medium mb-6">
+                  <MapPin size={16} className="text-cyan-400" /> {selectedProperty.street}, {selectedProperty.city}
+                </div>
+
+                <p className="text-zinc-400 text-sm leading-relaxed mb-8">{selectedProperty.desc}</p>
+
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  {[
+                    { icon: <Music />, label: 'Category', val: selectedProperty.category },
+                    { icon: <Users />, label: 'Capacity', val: '500+ Expected' },
+                    { icon: <Clock />, label: 'Date', val: 'This Weekend' },
+                  ].map((feat) => (
+                    <div key={feat.label} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center gap-4">
+                      <div className="text-cyan-400">{feat.icon}</div>
+                      <div>
+                        <p className="text-[10px] font-black text-zinc-500 uppercase">{feat.label}</p>
+                        <p className="text-sm font-bold">{feat.val}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-auto bg-black/40 border border-white/5 p-6 rounded-[2rem]">
+                  {!paymentSuccess ? (
+                    <div className="flex flex-col gap-4">
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Ticket Cost</p>
+                          <p className="text-3xl font-black text-white">{selectedProperty.price === 0 ? 'Free Entry' : `₹${selectedProperty.price}`}</p>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Status</p>
+                           <p className="text-lg font-bold text-zinc-300">Available</p>
+                        </div>
+                      </div>
+                      <button 
+                          onClick={() => setShowBookingForm(true)}
+                          disabled={selectedProperty.isBooked}
+                          className="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 py-4 rounded-2xl font-bold uppercase tracking-widest text-sm hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50 text-white"
+                        >
+                        {isPaying ? <Loader2 className="animate-spin" /> : 'Get Ticket Now'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <CheckCircle size={48} className="text-cyan-400 mx-auto mb-4" />
+                      <h3 className="text-2xl font-black mb-1">Ticket Secured!</h3>
+                      <p className="text-zinc-400 text-xs mb-6">Ticket ID: #EV_{Math.floor(Math.random()*100000)}</p>
+                      <button onClick={() => setSelectedProperty(null)} className="w-full bg-white/10 py-3 rounded-xl font-bold uppercase text-xs hover:bg-white/20 transition-colors">Close</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- BOOKING FORM MODAL --- */}
+      <AnimatePresence>
+        {showBookingForm && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[2.5rem] p-8 w-full max-w-md relative shadow-2xl">
+              <button onClick={() => setShowBookingForm(false)} className="absolute top-6 right-6 text-zinc-400 hover:text-white transition-colors"><X size={20}/></button>
+              <h2 className="text-2xl font-black text-white mb-1">Register for Event</h2>
+              <p className="text-zinc-400 text-sm mb-6 font-medium">Leave your details to register.</p>
+              
+              <form onSubmit={handleBookingSubmit} className="space-y-4 text-white">
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Your Name</label>
+                  <input required value={bookingData.name} onChange={e=>setBookingData({...bookingData, name: e.target.value})} placeholder="John Doe" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Phone Number</label>
+                  <input required type="number" value={bookingData.phone} onChange={e=>setBookingData({...bookingData, phone: e.target.value})} placeholder="9999999999" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Preferred Date</label>
+                  <input required type="date" value={bookingData.date} onChange={e=>setBookingData({...bookingData, date: e.target.value})} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium [color-scheme:dark]" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Message (Optional)</label>
+                  <textarea value={bookingData.message} onChange={e=>setBookingData({...bookingData, message: e.target.value})} placeholder="Any specific requirements?" rows={2} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium"></textarea>
+                </div>
+                
+                <button disabled={isBooking} type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-xl font-bold uppercase tracking-widest mt-2 hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50">
+                  {isBooking ? <Loader2 className="animate-spin" /> : 'Confirm Registration'}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
-  )
+  );
 }

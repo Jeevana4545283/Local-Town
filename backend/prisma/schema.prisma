@@ -1,0 +1,383 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  passwordHash String?
+  role         String   @default("user")
+  avatarUrl    String?
+  country      String?
+  state        String?
+  village      String?
+  pincode      String?
+  theme        String   @default("dark")
+  googleId     String?  @unique
+  authProvider String   @default("local")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  offerLikes   OfferLike[]
+  savedOffers  SavedOffer[]
+  offerComments OfferComment[]
+  owner        Owner?
+}
+
+model Owner {
+  id        String    @id @default(uuid())
+  name      String
+  email     String    @unique
+  userId    String?   @unique
+  user      User?     @relation(fields: [userId], references: [id])
+  role      String    @default("OWNER")
+  categories Json?
+  avatarUrl    String?
+  businessName String?
+  phone        String?
+  address      String?
+  state        String?
+  pincode      String?
+  description  String? @db.Text
+  theme        String   @default("dark")
+  
+  rentals             Rental[]
+  bookings            Booking[]
+  
+  services            Service[]
+  serviceBookings     ServiceBooking[]
+  
+  workers             Worker[]
+  workerBookings      WorkerBooking[]
+  
+  offers              Offer[]
+  offerOrders         OfferOrder[]
+  
+  events              Event[]
+  eventRegistrations  EventRegistration[]
+  
+  marketplaceItems    MarketplaceItem[]
+  marketplaceOrders   MarketplaceOrder[]
+
+  conversations Conversation[]
+  createdAt     DateTime  @default(now())
+}
+
+// --- RENTALS ---
+model Rental {
+  id            String    @id @default(uuid())
+  ownerId       String
+  owner         Owner     @relation(fields: [ownerId], references: [id])
+  title         String
+  address       String
+  pincode       Int
+  nearbyAreas   Json
+  rentPrice     Float
+  phoneNumber   String
+  description   String    @db.Text
+  imageUrls     Json
+  latitude      Float
+  longitude     Float
+  status        String    @default("Available")
+  bookings      Booking[]
+  conversations Conversation[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Booking {
+  id          String   @id @default(uuid())
+  rentalId    String
+  rental      Rental   @relation(fields: [rentalId], references: [id])
+  ownerId     String
+  owner       Owner    @relation(fields: [ownerId], references: [id])
+  userId      String?  
+  userName    String
+  userPhone   String
+  visitDate   String
+  message     String?  @db.Text
+  status      String   @default("Pending") // Pending, Accepted, Rejected, Completed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// --- SERVICES ---
+model Service {
+  id            String    @id @default(uuid())
+  ownerId       String
+  owner         Owner     @relation(fields: [ownerId], references: [id])
+  title         String
+  address       String
+  pincode       Int
+  nearbyAreas   Json
+  price         Float     // Replaces rentPrice
+  phoneNumber   String
+  description   String    @db.Text
+  imageUrls     Json
+  latitude      Float
+  longitude     Float
+  status        String    @default("Available")
+  bookings      ServiceBooking[]
+  conversations Conversation[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model ServiceBooking {
+  id          String   @id @default(uuid())
+  serviceId   String
+  service     Service  @relation(fields: [serviceId], references: [id])
+  ownerId     String
+  owner       Owner    @relation(fields: [ownerId], references: [id])
+  userId      String?  
+  userName    String
+  userPhone   String
+  visitDate   String
+  message     String?  @db.Text
+  status      String   @default("Pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// --- WORKERS ---
+model Worker {
+  id            String    @id @default(uuid())
+  ownerId       String
+  owner         Owner     @relation(fields: [ownerId], references: [id])
+  name          String    @default("")
+  profession    String    @default("")
+  address       String
+  pincode       Int
+  nearbyAreas   Json?
+  hourlyRate    Float
+  phone         String    @default("")
+  description   String?   @db.Text
+  imageUrls     Json?
+  latitude      Float?
+  longitude     Float?
+  status        String    @default("Available")
+  bookings      WorkerBooking[]
+  conversations Conversation[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model WorkerBooking {
+  id          String   @id @default(uuid())
+  workerId    String
+  worker      Worker   @relation(fields: [workerId], references: [id])
+  ownerId     String
+  owner       Owner    @relation(fields: [ownerId], references: [id])
+  userId      String?  
+  userName    String
+  userPhone   String
+  visitDate   String
+  message     String?  @db.Text
+  status      String   @default("Pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// --- OFFERS ---
+model Offer {
+  id            String    @id @default(uuid())
+  ownerId       String
+  owner         Owner     @relation(fields: [ownerId], references: [id])
+  title         String
+  address       String
+  pincode       Int
+  nearbyAreas   Json
+  discountPrice Float     // Replaces rentPrice
+  phoneNumber   String
+  description   String    @db.Text
+  imageUrls     Json
+  latitude      Float
+  longitude     Float
+  status        String    @default("Active")
+  orders        OfferOrder[]
+  conversations Conversation[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  likes         OfferLike[]
+  saves         SavedOffer[]
+  comments      OfferComment[]
+}
+
+model OfferOrder {
+  id          String   @id @default(uuid())
+  offerId     String
+  offer       Offer    @relation(fields: [offerId], references: [id])
+  ownerId     String
+  owner       Owner    @relation(fields: [ownerId], references: [id])
+  userId      String?  
+  userName    String
+  userPhone   String
+  visitDate   String
+  message     String?  @db.Text
+  status      String   @default("Pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OfferLike {
+  id        String   @id @default(uuid())
+  offerId   String
+  offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([offerId, userId])
+}
+
+model SavedOffer {
+  id        String   @id @default(uuid())
+  offerId   String
+  offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([offerId, userId])
+}
+
+model OfferComment {
+  id        String   @id @default(uuid())
+  offerId   String
+  offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   String   @db.Text
+  createdAt DateTime @default(now())
+}
+
+// --- EVENTS ---
+model Event {
+  id            String    @id @default(uuid())
+  ownerId       String
+  owner         Owner     @relation(fields: [ownerId], references: [id])
+  title         String
+  address       String
+  pincode       Int
+  nearbyAreas   Json
+  ticketPrice   Float     // Replaces rentPrice
+  phoneNumber   String
+  description   String    @db.Text
+  imageUrls     Json
+  latitude      Float
+  longitude     Float
+  status        String    @default("Upcoming")
+  registrations EventRegistration[]
+  conversations Conversation[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model EventRegistration {
+  id          String   @id @default(uuid())
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id])
+  ownerId     String
+  owner       Owner    @relation(fields: [ownerId], references: [id])
+  userId      String?  
+  userName    String
+  userPhone   String
+  visitDate   String
+  message     String?  @db.Text
+  status      String   @default("Pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// --- MARKETPLACE ---
+model MarketplaceItem {
+  id            String    @id @default(uuid())
+  ownerId       String
+  owner         Owner     @relation(fields: [ownerId], references: [id])
+  title         String
+  address       String
+  pincode       Int
+  nearbyAreas   Json
+  itemPrice     Float     // Replaces rentPrice
+  phoneNumber   String
+  description   String    @db.Text
+  imageUrls     Json
+  latitude      Float
+  longitude     Float
+  status        String    @default("Available")
+  orders        MarketplaceOrder[]
+  conversations Conversation[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model MarketplaceOrder {
+  id              String   @id @default(uuid())
+  marketplaceItemId String
+  item            MarketplaceItem @relation(fields: [marketplaceItemId], references: [id])
+  ownerId         String
+  owner           Owner    @relation(fields: [ownerId], references: [id])
+  userId          String?  
+  userName        String
+  userPhone       String
+  visitDate       String
+  message         String?  @db.Text
+  status          String   @default("Pending")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// --- GLOBAL ---
+model Conversation {
+  id        String    @id @default(uuid())
+  ownerId   String
+  owner     Owner     @relation(fields: [ownerId], references: [id])
+  userId    String    
+  userName  String    
+  
+  // Optional relations to link conversation to specific item
+  rentalId  String?
+  rental    Rental?   @relation(fields: [rentalId], references: [id])
+  serviceId String?
+  service   Service?  @relation(fields: [serviceId], references: [id])
+  workerId  String?
+  worker    Worker?   @relation(fields: [workerId], references: [id])
+  offerId   String?
+  offer     Offer?    @relation(fields: [offerId], references: [id])
+  eventId   String?
+  event     Event?    @relation(fields: [eventId], references: [id])
+  marketplaceItemId String?
+  marketplaceItem   MarketplaceItem? @relation(fields: [marketplaceItemId], references: [id])
+
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Message {
+  id              String       @id @default(uuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId        String       
+  message         String       @db.Text
+  isRead          Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   
+  title     String
+  message   String   @db.Text
+  type      String   
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

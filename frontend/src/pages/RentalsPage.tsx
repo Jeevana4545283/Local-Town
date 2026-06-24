@@ -1,26 +1,22 @@
-import { useState, useMemo } from 'react';
-
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
-  Search, MapPin, Star, Share2, Plus, 
+  Search, MapPin, Star, Heart, 
   Home, X, Loader2, CheckCircle,
-  ArrowUpRight, Filter, Camera,
-
-  Wifi, Coffee, ShieldCheck, Heart, Users, 
-  TrendingUp, BarChart3, Building2, 
-  Eye, IndianRupee, Zap, Download
-
+  ArrowUpRight, ShieldCheck, Camera,
+  MessageSquare, Plus, ChevronLeft, Bookmark
 } from 'lucide-react';
 
 // --- Enhanced Types ---
-interface Property {
+interface Rental {
   id: string;
   title: string;
   price: number;
   city: string;
   street: string;
-  category: 'PG' | 'Hostel' | 'Apartment' | 'Villa' | '1BHK' | '2BHK' | '3BHK';
-  type: 'Furnished' | 'Unfurnished' | 'Semi-Furnished';
+  category: string;
+  furnishing: string;
   nearby: string[];
   rating: number;
   reviewsCount: number;
@@ -31,107 +27,82 @@ interface Property {
   isBooked: boolean;
   isVerified: boolean;
   amenities: string[];
+  phone?: string;
+  ownerName?: string;
+  likesCount?: number;
+  commentsCount?: number;
 }
 
-// --- Realistic Expanded Data ---
-const INITIAL_PROPERTIES: Property[] = [
-  { 
-    id: 'p1', 
-    title: 'Skyline Luxury Penthouse', 
-    price: 55000, 
-    city: 'Hyderabad',
-    street: 'Financial District',
-    category: '3BHK',
-    type: 'Furnished',
-    nearby: ['Wipro Circle', 'Microsoft IT Park', 'Continental Hospital'],
-    rating: 4.9, 
-    reviewsCount: 124,
-    liveVisitors: 12,
-    img: ['https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80', 'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&q=80'],
-    tags: ['Luxury', 'Trending'],
-    desc: 'Breathtaking city views with automated smart home features. Prime location for IT professionals.',
-    isBooked: false,
-    isVerified: true,
-    amenities: ['Wifi', 'Gym', 'Pool', 'Parking']
-  },
-  { 
-    id: 'p2', 
-    title: 'Modern Student Co-Living', 
-    price: 12500, 
-    city: 'Bangalore',
-    street: 'Koramangala',
-    category: 'PG',
-    type: 'Furnished',
-    nearby: ['Christ College', 'St. Johns Hospital', 'Forum Mall'],
-    rating: 4.5, 
-    reviewsCount: 89,
-    liveVisitors: 45,
-    img: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80'],
-    tags: ['Student Friendly', 'Verified'],
-    desc: 'High-speed internet and home-style meals included. Walkable distance to major colleges.',
-    isBooked: false,
-    isVerified: true,
-    amenities: ['Wifi', 'Food', 'Laundry']
-  },
-  { 
-    id: 'p3', 
-    title: 'The Green Villa', 
-    price: 85000, 
-    city: 'Hyderabad',
-    street: 'Jubilee Hills',
-    category: 'Villa',
-    type: 'Furnished',
-    nearby: ['Apollo Hospital', 'KBR Park', 'Metro Station'],
-    rating: 5.0, 
-    reviewsCount: 42,
-    liveVisitors: 5,
-    img: ['https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&q=80'],
-    tags: ['Premium', 'Family'],
-    desc: 'Independent villa with private lawn, 24/7 security, and ultra-modern kitchen.',
-    isBooked: false,
-    isVerified: true,
-    amenities: ['Garden', 'Security', 'EV Charging']
-  },
-  { 
-    id: 'p4', 
-    title: 'Urban Hive Hostel', 
-    price: 8000, 
-    city: 'Pune',
-    street: 'Viman Nagar',
-    category: 'Hostel',
-    type: 'Semi-Furnished',
-    nearby: ['Symbiosis College', 'Phoenix Mall', 'IT Park'],
-    rating: 4.2, 
-    reviewsCount: 210,
-    liveVisitors: 67,
-    img: ['https://images.unsplash.com/photo-1555854817-5b2738a75574?auto=format&fit=crop&q=80'],
-    tags: ['Budget', 'Popular'],
-    desc: 'Vibrant community living with shared workspaces and rooftop cafe.',
-    isBooked: true,
-    isVerified: true,
-    amenities: ['Wifi', 'Cafe', 'Gaming Zone']
-  }
-];
-
 export function RentalsPage() {
-  const [properties, setProperties] = useState<Property[]>(INITIAL_PROPERTIES);
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [isPaying, setIsPaying] = useState(false);
+  const [properties, setProperties] = useState<Rental[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedProperty, setSelectedProperty] = useState<Rental | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [saved, setSaved] = useState<string[]>([]);
   const [activeImgIdx, setActiveImgIdx] = useState(0);
+
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [bookingData, setBookingData] = useState({ name: '', phone: '', date: '', message: '' });
+  const [isBooking, setIsBooking] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+
+  const getUserId = () => {
+    let id = localStorage.getItem('lt_guest_id')
+    if (!id) {
+      id = 'guest-' + Math.random().toString(36).substr(2, 9)
+      localStorage.setItem('lt_guest_id', id)
+    }
+    return id
+  }
+
+  const navigate = useNavigate();
 
   // --- Advanced Filter State ---
   const [filters, setFilters] = useState({
     city: 'All',
     category: 'All',
-    type: 'All',
+    furnishing: 'All',
     budget: 100000,
-    proximity: 'All'
+    amenities: [] as string[]
   });
+
+  useEffect(() => {
+    fetch('http://localhost:4000/api/rentals')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.items) {
+          const mapped: Rental[] = data.items.map((r: any) => ({
+            id: r.id,
+            title: r.title || 'Beautiful Rental',
+            price: r.rentPrice || 0,
+            city: r.address?.split(',').pop()?.trim() || 'Unknown',
+            street: r.address || '',
+            category: r.title?.includes('Villa') ? 'Villa' : r.title?.includes('PG') ? 'PG' : 'Apartment',
+            furnishing: 'Furnished', // Default
+            nearby: r.nearbyAreas || [],
+            rating: 4.8,
+            reviewsCount: Math.floor(Math.random() * 50) + 10,
+            liveVisitors: Math.floor(Math.random() * 10) + 1,
+            img: r.imageUrls?.length ? r.imageUrls : ['https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&q=80'],
+            tags: ['Verified'],
+            desc: r.description || 'Premium verified property ready to move in.',
+            isBooked: r.status === 'Booked',
+            isVerified: true,
+            amenities: ['WiFi', 'Parking', 'AC', 'Security'],
+            phone: r.phoneNumber || '',
+            ownerName: 'Verified Owner',
+            likesCount: Math.floor(Math.random() * 100) + 10,
+            commentsCount: Math.floor(Math.random() * 20) + 2
+          }));
+          setProperties(mapped);
+        }
+      })
+      .catch((err) => console.error("Failed to load rentals:", err))
+      .finally(() => setLoading(false));
+  }, []);
 
   // --- Smart Search & Filtering Logic ---
   const filteredProperties = useMemo(() => {
@@ -143,11 +114,11 @@ export function RentalsPage() {
       
       const matchesCity = filters.city === 'All' || p.city === filters.city;
       const matchesCategory = filters.category === 'All' || p.category === filters.category;
-      const matchesType = filters.type === 'All' || p.type === filters.type;
+      const matchesFurnishing = filters.furnishing === 'All' || p.furnishing === filters.furnishing;
       const matchesBudget = p.price <= filters.budget;
-      const matchesProx = filters.proximity === 'All' || p.nearby.some(n => n.includes(filters.proximity));
+      const matchesAmenities = filters.amenities.length === 0 || filters.amenities.every(a => p.amenities.includes(a));
 
-      return matchesSearch && matchesCity && matchesCategory && matchesType && matchesBudget && matchesProx;
+      return matchesSearch && matchesCity && matchesCategory && matchesFurnishing && matchesBudget && matchesAmenities;
     });
   }, [properties, searchQuery, filters]);
 
@@ -157,375 +128,448 @@ export function RentalsPage() {
     setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
   };
 
-  const handlePayment = async (property: Property) => {
-    setIsPaying(true);
-    // Mock Razorpay / Backend Handshake
-    setTimeout(() => {
-      setPaymentSuccess(true);
-      setIsPaying(false);
-      setProperties(prev => prev.map(p => p.id === property.id ? { ...p, isBooked: true } : p));
-    }, 2000);
+  const toggleSave = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setSaved(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  };
+
+  const toggleAmenity = (amenity: string) => {
+    setFilters(prev => ({
+      ...prev,
+      amenities: prev.amenities.includes(amenity) 
+        ? prev.amenities.filter(a => a !== amenity)
+        : [...prev.amenities, amenity]
+    }));
+  };
+
+  const handleBookingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProperty) return;
+    
+    setIsBooking(true);
+    try {
+      const res = await fetch('http://localhost:4000/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rentalId: selectedProperty.id,
+          userName: bookingData.name || 'Guest',
+          userPhone: bookingData.phone || '0000000000',
+          visitDate: bookingData.date || new Date().toISOString(),
+          message: bookingData.message,
+          userId: getUserId()
+        })
+      });
+      if (res.ok) {
+        setPaymentSuccess(true);
+        setShowBookingForm(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-indigo-100">
+    <div className="relative h-screen w-screen overflow-hidden bg-zinc-950 font-sans text-white">
       
-      {/* --- NAVIGATION --- */}
-      <nav className="sticky top-0 z-[60] bg-white/70 backdrop-blur-xl border-b border-slate-200/60 px-6 md:px-8 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.reload()}>
-            <div className="bg-indigo-600 p-2 rounded-2xl text-white shadow-lg shadow-indigo-200">
-              <Home size={22} />
+      {/* --- PREMIUM BACKGROUND --- */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900" />
+        <div className="absolute -left-32 -top-32 size-[40rem] rounded-full bg-cyan-500/20 blur-[100px]" />
+        <div className="absolute -right-32 bottom-0 size-[40rem] rounded-full bg-purple-500/20 blur-[100px]" />
+        <div className="absolute left-1/3 top-1/2 size-[30rem] -translate-y-1/2 rounded-full bg-indigo-500/10 blur-[100px]" />
+      </div>
+
+      {/* --- MAIN GLASS CONTAINER --- */}
+      <div className="relative z-10 flex h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] m-4 overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] backdrop-blur-2xl">
+        
+        {/* --- LEFT SIDEBAR --- */}
+        <aside className="flex w-[260px] flex-col border-r border-white/10 bg-black/20 p-6">
+          <div className="mb-10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg">
+                <Home size={18} />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-white">LocalTown</span>
             </div>
-            <span className="font-black text-2xl tracking-tighter text-slate-900 uppercase">SmartTown</span>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setShowAddForm(true)}
-              className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-full font-bold text-sm hover:scale-105 transition-all"
-            >
-              <Plus size={18}/> List Property
+            <button onClick={() => navigate(-1)} className="grid size-8 place-items-center rounded-full bg-white/5 hover:bg-white/10 transition">
+              <ChevronLeft size={18} className="text-zinc-300" />
             </button>
-            <div className="relative cursor-pointer hover:scale-110 transition-transform">
-              <Heart className={favorites.length > 0 ? "text-red-500 fill-red-500" : "text-slate-600"} size={24} />
-              <span className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center">{favorites.length}</span>
-            </div>
           </div>
-        </div>
-      </nav>
 
-      {/* --- ANALYTICS DASHBOARD WIDGETS --- */}
-      <section className="max-w-7xl mx-auto px-8 pt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Live Demand', val: 'High', icon: <TrendingUp size={16}/>, color: 'text-orange-500' },
-          { label: 'Avg Rent', val: '₹22,400', icon: <IndianRupee size={16}/>, color: 'text-emerald-500' },
-          { label: 'Occupancy', val: '94%', icon: <BarChart3 size={16}/>, color: 'text-indigo-500' },
-          { label: 'Popular Area', val: 'Hitech City', icon: <Building2 size={16}/>, color: 'text-blue-500' },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center gap-4">
-
-            <div className={`p-3 rounded-2xl bg-slate-50 ${stat.color}`}>{stat.icon}</div>
+          {/* Filters Sidebar */}
+          <div className="flex flex-1 flex-col gap-8 overflow-y-auto custom-scrollbar pr-2 mt-4">
+            
+            {/* Property Type */}
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
-              <p className="text-sm font-black">{stat.val}</p>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Property Type</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Apartment', 'Villa', 'PG', 'Hostel', 'House'].map(c => (
+                  <label key={c} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, category: c})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.category === c ? 'border-cyan-500 bg-cyan-500/20 text-cyan-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.category === c && <div className="size-2.5 rounded-sm bg-cyan-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.category === c ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{c}</span>
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </section>
 
-      {/* --- HERO & ADVANCED SEARCH --- */}
-      <section className="max-w-7xl mx-auto px-8 pt-12 pb-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-[0.9] mb-8">
-            Find your next <br/><span className="text-indigo-600">Smart Stay.</span>
-          </h1>
+            {/* Furnishing */}
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Furnishing</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Furnished', 'Semi Furnished', 'Unfurnished'].map(t => (
+                  <label key={t} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, furnishing: t})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.furnishing === t ? 'border-indigo-500 bg-indigo-500/20 text-indigo-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.furnishing === t && <div className="size-2.5 rounded-sm bg-indigo-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.furnishing === t ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{t === 'All' ? 'Any' : t}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Amenities */}
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Amenities</p>
+              <div className="flex flex-col gap-3">
+                {['Parking', 'WiFi', 'AC', 'Security', 'Water'].map(a => (
+                  <label key={a} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleAmenity(a)}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.amenities.includes(a) ? 'border-cyan-500 bg-cyan-500/20 text-cyan-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.amenities.includes(a) && <div className="size-2.5 rounded-sm bg-cyan-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.amenities.includes(a) ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{a}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Budget */}
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Max Rent: ₹{filters.budget.toLocaleString()}</p>
+              <input 
+                type="range" min="1000" max="100000" step="1000" 
+                value={filters.budget}
+                onChange={(e) => setFilters({...filters, budget: parseInt(e.target.value)})}
+                className="w-full accent-cyan-500"
+              />
+              <div className="flex justify-between mt-2 text-xs text-zinc-500 font-bold">
+                <span>₹1K</span>
+                <span>₹100K+</span>
+              </div>
+            </div>
+
+          </div>
+
+          <button 
+            onClick={() => setShowAddForm(true)}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:scale-105"
+          >
+            <Plus size={18}/> List Property
+          </button>
+        </aside>
+
+        {/* --- RIGHT CONTENT AREA --- */}
+        <main className="flex flex-1 flex-col overflow-y-auto custom-scrollbar relative">
           
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col md:flex-row gap-3 bg-white p-3 rounded-[2.5rem] shadow-2xl shadow-indigo-100 border border-slate-100 max-w-5xl">
-              <div className="flex-[2] flex items-center gap-4 px-6 py-3 border-r border-slate-100">
-                <Search className="text-indigo-500" size={22} />
+          <header className="sticky top-0 z-50 border-b border-white/10 bg-white/5 backdrop-blur-xl px-8 py-6 flex flex-col md:flex-row gap-6 md:items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-black text-white">Find Your Perfect Stay</h1>
+              <p className="mt-1 text-sm font-medium text-zinc-400">Explore verified rentals near your location</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10 w-[300px]">
+                <Search size={18} className="text-zinc-400" />
                 <input 
                   type="text" 
-                  placeholder="Search street, college, or IT park..." 
-                  className="w-full bg-transparent outline-none font-semibold placeholder:text-slate-300"
+                  placeholder="Search city, area, locality..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent text-sm font-medium text-white placeholder-zinc-500 outline-none"
                 />
               </div>
-              <div className="flex-1 hidden md:flex items-center gap-3 px-4">
-                <MapPin className="text-slate-400" size={18} />
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10">
+                <MapPin size={18} className="text-zinc-400" />
                 <select 
-                  className="bg-transparent outline-none font-bold text-sm w-full cursor-pointer"
                   onChange={(e) => setFilters({...filters, city: e.target.value})}
+                  className="w-[120px] bg-transparent text-sm font-medium text-white outline-none appearance-none"
                 >
-                  <option value="All">All Cities</option>
-                  <option value="Hyderabad">Hyderabad</option>
-                  <option value="Bangalore">Bangalore</option>
-                  <option value="Pune">Pune</option>
+                  <option className="bg-zinc-900" value="All">All Cities</option>
+                  <option className="bg-zinc-900" value="Hyderabad">Hyderabad</option>
+                  <option className="bg-zinc-900" value="Bangalore">Bangalore</option>
+                  <option className="bg-zinc-900" value="Pune">Pune</option>
                 </select>
               </div>
-              <button 
-                onClick={() => setShowFilters(!showFilters)}
-                className="bg-slate-100 text-slate-900 px-6 py-4 rounded-[2rem] font-black uppercase text-xs flex items-center gap-2 hover:bg-slate-200 transition-all"
-              >
-                <Filter size={16}/> Filters
-              </button>
-              <button className="bg-indigo-600 text-white px-10 py-4 rounded-[2rem] font-black uppercase tracking-widest text-xs hover:bg-slate-900 transition-colors">
-                Search
-              </button>
+            </div>
+          </header>
+
+          <div className="p-8">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex gap-4">
+                {['Verified Places', 'New Arrivals', 'Trending'].map((tab, i) => (
+                  <span key={tab} className={`text-sm font-bold cursor-pointer transition-colors ${i === 0 ? 'text-cyan-400 border-b-2 border-cyan-400 pb-1' : 'text-zinc-500 hover:text-zinc-300'}`}>{tab}</span>
+                ))}
+              </div>
+              <p className="text-sm font-medium text-zinc-500">{filteredProperties.length} Properties Found</p>
             </div>
 
-            {/* --- EXPANDABLE FILTERS --- */}
-            <AnimatePresence>
-              {showFilters && (
-                <motion.div 
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-xl"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Property Category</p>
-                      <div className="flex flex-wrap gap-2">
-                        {['All', 'PG', 'Hostel', 'Apartment', 'Villa'].map(c => (
-                          <button 
-                            key={c}
-                            onClick={() => setFilters({...filters, category: c})}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filters.category === c ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
-                          >
-                            {c}
-                          </button>
-                        ))}
+            {filteredProperties.length === 0 && !loading ? (
+              <div className="flex flex-col items-center justify-center py-20 mt-10 rounded-[2rem] border border-white/5 bg-white/5 backdrop-blur-sm">
+                <Home size={64} className="text-zinc-600 mb-6" />
+                <h3 className="text-2xl font-black text-white mb-2">No rentals found in this area</h3>
+                <p className="text-zinc-400 mb-8 max-w-sm text-center">We couldn't find any properties matching your exact filters. Try adjusting your search.</p>
+                <button onClick={() => setShowAddForm(true)} className="bg-white/10 hover:bg-white/20 transition-all text-white font-bold px-8 py-3 rounded-xl border border-white/10">
+                  List your property
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-8">
+                {filteredProperties.map((p, idx) => (
+                  <motion.div 
+                    key={p.id} 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: idx * 0.05 }}
+                    whileHover={{ scale: 1.02 }}
+                    onClick={() => { setSelectedProperty(p); setPaymentSuccess(false); setActiveImgIdx(0); }}
+                    className={`group relative flex flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-md cursor-pointer transition-all hover:bg-white/10 hover:shadow-cyan-500/10 ${p.isBooked ? 'opacity-60 grayscale-[30%]' : ''}`}
+                  >
+                    <div className="relative h-64 overflow-hidden">
+                      <img src={p.img[0]} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                      
+                      {/* Booking Overlay */}
+                      {p.isBooked && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-10">
+                          <div className="bg-red-500/90 text-white font-black px-6 py-2 rounded-xl tracking-widest uppercase border border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.5)] transform -rotate-12 scale-110">
+                            BOOKED
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="absolute left-4 top-4 flex flex-col gap-2 z-20">
+                        {p.isVerified && <span className="flex items-center gap-1 rounded-full bg-cyan-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm"><ShieldCheck size={12}/> Verified</span>}
+                        <span className="flex w-fit items-center gap-1 rounded-full bg-indigo-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm">{p.category}</span>
+                      </div>
+
+                      <div className="absolute right-4 top-4 z-20">
+                        <button 
+                          onClick={(e) => toggleSave(e, p.id)}
+                          className={`grid size-10 place-items-center rounded-full backdrop-blur-md transition-all border border-white/20 ${saved.includes(p.id) ? 'bg-indigo-500/90 text-white' : 'bg-black/40 text-white hover:bg-black/60'}`}
+                        >
+                          <Bookmark size={18} fill={saved.includes(p.id) ? "currentColor" : "none"} />
+                        </button>
+                      </div>
+
+                      <div className="absolute bottom-4 left-4 right-4 z-20">
+                        <h3 className="text-xl font-bold leading-tight text-white">{p.title}</h3>
+                        <p className="mt-1 flex items-center gap-1 text-sm font-medium text-zinc-300">
+                          <MapPin size={14} className="text-cyan-400" /> {p.street}, {p.city}
+                        </p>
                       </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Max Budget: ₹{filters.budget.toLocaleString()}</p>
-                      <input 
-                        type="range" min="5000" max="100000" step="5000" 
-                        value={filters.budget}
-                        onChange={(e) => setFilters({...filters, budget: parseInt(e.target.value)})}
-                        className="w-full accent-indigo-600"
-                      />
+
+                    <div className="flex flex-1 flex-col p-6 relative z-20">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="flex flex-wrap gap-2">
+                          {p.amenities.slice(0,2).map(a => (
+                            <span key={a} className="rounded-lg bg-white/10 px-2 py-1 text-[10px] font-bold text-zinc-300 border border-white/5">{a}</span>
+                          ))}
+                          {p.amenities.length > 2 && <span className="rounded-lg bg-white/10 px-2 py-1 text-[10px] font-bold text-zinc-300 border border-white/5">+{p.amenities.length - 2}</span>}
+                        </div>
+                        <div className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-xs font-bold text-yellow-400 border border-white/5">
+                          <Star size={12} fill="currentColor" /> {p.rating}
+                        </div>
+                      </div>
+
+                      <div className="mb-4 text-xs font-medium text-zinc-400">
+                        Listed by <span className="text-zinc-200">{p.ownerName}</span>
+                      </div>
+
+                      <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-4 mb-4">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Monthly Rent</p>
+                          <div className="text-2xl font-black text-white">₹{p.price.toLocaleString()}</div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setShowBookingForm(true); setSelectedProperty(p); }}
+                            className="bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500 hover:text-white transition-colors px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest"
+                          >
+                            Book
+                          </button>
+                          <button className="grid size-10 place-items-center rounded-xl bg-white/10 text-white transition-colors hover:bg-white/20">
+                            <ArrowUpRight size={18} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Social Interactions Strip */}
+                      <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                        <div className="flex items-center gap-4">
+                          <button onClick={(e) => toggleFavorite(e, p.id)} className={`flex items-center gap-1.5 text-xs font-bold ${favorites.includes(p.id) ? 'text-red-400' : 'text-zinc-400 hover:text-zinc-200'}`}>
+                            <Heart size={14} fill={favorites.includes(p.id) ? "currentColor" : "none"} /> {favorites.includes(p.id) ? p.likesCount! + 1 : p.likesCount}
+                          </button>
+                          <button className="flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-zinc-200">
+                            <MessageSquare size={14} /> {p.commentsCount}
+                          </button>
+                        </div>
+                        <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                          {p.furnishing}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Furnishing</p>
-                      <select 
-                        className="w-full p-3 bg-slate-50 rounded-2xl text-sm font-bold outline-none"
-                        onChange={(e) => setFilters({...filters, type: e.target.value})}
-                      >
-                        <option value="All">All Types</option>
-                        <option value="Furnished">Fully Furnished</option>
-                        <option value="Semi-Furnished">Semi-Furnished</option>
-                        <option value="Unfurnished">Unfurnished</option>
-                      </select>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Near Places</p>
-                      <select 
-                        className="w-full p-3 bg-slate-50 rounded-2xl text-sm font-bold outline-none"
-                        onChange={(e) => setFilters({...filters, proximity: e.target.value})}
-                      >
-                        <option value="All">Anywhere</option>
-                        <option value="Metro">Near Metro</option>
-                        <option value="College">Near College</option>
-                        <option value="IT Park">Near IT Park</option>
-                        <option value="Hospital">Near Hospital</option>
-                      </select>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* --- PROPERTY GRID --- */}
-      <main className="max-w-7xl mx-auto px-8 pb-24">
-        <div className="flex items-center justify-between mb-10">
-          <div>
-            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Curated Collections</h2>
-            <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
-              {['Trending', 'Luxury', 'Student-Friendly', 'Family'].map(tab => (
-                <span key={tab} className="whitespace-nowrap text-sm font-black text-slate-900 border-b-2 border-indigo-600 pb-1 cursor-pointer">{tab}</span>
-              ))}
-            </div>
-          </div>
-          <p className="text-sm font-bold text-slate-400">{filteredProperties.length} Properties Found</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-          {filteredProperties.map((p, idx) => (
-            <motion.div 
-              key={p.id} 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: idx * 0.05 }}
-              whileHover={{ y: -10 }}
-              onClick={() => { setSelectedProperty(p); setPaymentSuccess(false); setActiveImgIdx(0); }}
-              className={`group bg-white rounded-[3rem] overflow-hidden border border-slate-100 hover:shadow-2xl transition-all cursor-pointer relative ${p.isBooked ? 'opacity-75' : ''}`}
-            >
-              <div className="relative h-72 overflow-hidden">
-                <img src={p.img[0]} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                
-                {/* Status Badges */}
-                <div className="absolute top-6 left-6 flex flex-col gap-2">
-                   {p.isBooked && <span className="bg-red-500 text-white text-[9px] font-black uppercase px-3 py-1 rounded-full shadow-lg">Sold Out</span>}
-                   {p.isVerified && <span className="bg-emerald-500 text-white text-[9px] font-black uppercase px-3 py-1 rounded-full shadow-lg flex items-center gap-1"><ShieldCheck size={10}/> Owner Verified</span>}
-                </div>
-
-                <div className="absolute top-6 right-6 flex flex-col gap-2">
-                  <button className="bg-white/90 backdrop-blur p-3 rounded-2xl shadow-xl hover:bg-indigo-600 hover:text-white transition-all">
-                    <Share2 size={18} />
-                  </button>
-                  <button 
-                    onClick={(e) => toggleFavorite(e, p.id)}
-                    className={`bg-white/90 backdrop-blur p-3 rounded-2xl shadow-xl transition-all ${favorites.includes(p.id) ? 'bg-red-500 text-white' : 'hover:bg-red-500 hover:text-white'}`}
-                  >
-                    <Heart size={18} fill={favorites.includes(p.id) ? "currentColor" : "none"} />
-                  </button>
-                </div>
-
-                <div className="absolute bottom-6 left-6 flex gap-2">
-                  <span className="bg-slate-900/80 backdrop-blur text-white text-[9px] font-black uppercase px-3 py-1 rounded-full flex items-center gap-1">
-                    <Eye size={10}/> {p.liveVisitors} viewing
-                  </span>
-                </div>
+                  </motion.div>
+                ))}
               </div>
+            )}
+          </div>
+        </main>
+      </div>
 
-              <div className="p-8">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-xl font-black tracking-tight">{p.title}</h3>
-                  <div className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg text-[10px] font-bold">
-                    <Star size={12} fill="currentColor" /> {p.rating} ({p.reviewsCount})
-                  </div>
+      {/* --- ADD PROPERTY MODAL --- */}
+      <AnimatePresence>
+        {showAddForm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[3rem] p-10 w-full max-w-lg relative shadow-2xl">
+              <button onClick={() => setShowAddForm(false)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors"><X size={24}/></button>
+              <h2 className="text-3xl font-black mb-2">List Your Property</h2>
+              <p className="text-zinc-400 text-sm mb-8 font-medium">Reach thousands of verified tenants.</p>
+              
+              <div className="space-y-4">
+                <div className="h-32 border-2 border-dashed border-white/20 bg-white/5 rounded-3xl flex flex-col items-center justify-center text-zinc-400 hover:border-cyan-400 hover:text-cyan-400 transition-colors cursor-pointer group">
+                  <Camera size={28} className="mb-2" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Drop Photos Here</span>
                 </div>
-                <p className="text-slate-400 text-sm mb-4 flex items-center gap-1 font-medium italic">
-                   {p.street}, {p.city}
-                </p>
-                
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {p.amenities.slice(0,3).map(a => (
-                    <span key={a} className="text-[9px] font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-md border border-slate-100">{a}</span>
-                  ))}
+                <input type="text" placeholder="Property Title (e.g. Modern 2BHK)" className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
+                <div className="flex gap-4">
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Hyderabad</option>
+                    <option>Bangalore</option>
+                  </select>
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Apartment</option>
+                    <option>Villa</option>
+                    <option>PG</option>
+                  </select>
                 </div>
-
-                <div className="flex justify-between items-center pt-6 border-t border-slate-50">
-                  <div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Monthly Rent</span>
-                    <p className="text-2xl font-black text-slate-900">₹{p.price.toLocaleString()}</p>
-                  </div>
-                  <button className={`p-4 rounded-2xl transition-all ${p.isBooked ? 'bg-slate-100 text-slate-400' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
-                    {p.isBooked ? <X size={22}/> : <ArrowUpRight size={22} />}
-                  </button>
+                <div className="flex gap-4">
+                  <input type="number" placeholder="Monthly Rent (₹)" className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
                 </div>
+                <button className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-2xl font-bold uppercase tracking-widest mt-4 hover:shadow-lg hover:shadow-cyan-500/20 transition-all">Submit Listing</button>
               </div>
             </motion.div>
-          ))}
-        </div>
-      </main>
+          </div>
+        )}
+      </AnimatePresence>
 
-      {/* --- DETAILED BOOKING MODAL --- */}
+      {/* --- RENTAL DETAIL MODAL --- */}
       <AnimatePresence>
         {selectedProperty && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xl">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xl">
             <motion.div 
               layoutId={selectedProperty.id} 
-              className="bg-white rounded-[3rem] md:rounded-[4rem] w-full max-w-6xl h-full max-h-[90vh] overflow-hidden flex flex-col md:flex-row shadow-2xl relative"
+              className="bg-zinc-900 border border-white/10 rounded-[2.5rem] w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl relative"
             >
-              <button 
-                onClick={() => setSelectedProperty(null)} 
-                className="absolute top-6 right-6 z-10 size-12 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-xl hover:rotate-90 transition-all md:hidden"
-              ><X /></button>
+              <button onClick={() => setSelectedProperty(null)} className="absolute top-4 right-4 z-50 grid size-10 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md md:hidden"><X size={18}/></button>
 
-              {/* Left: Gallery Slider */}
-              <div className="md:w-1/2 bg-slate-100 relative group/slider">
-                <img src={selectedProperty.img[activeImgIdx]} className="w-full h-full object-cover" />
-                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-2">
+              <div className="md:w-1/2 relative bg-black">
+                <img src={selectedProperty.img[activeImgIdx]} className="w-full h-full object-cover opacity-90" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-zinc-900/50 hidden md:block" />
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
                   {selectedProperty.img.map((img, i) => (
-                    <button 
-                      key={`${img}-${i}`} onClick={() => setActiveImgIdx(i)}
-                      className={`h-2 rounded-full transition-all ${activeImgIdx === i ? 'w-8 bg-white' : 'w-2 bg-white/40'}`}
-                    />
+                    <button key={i} onClick={() => setActiveImgIdx(i)} className={`h-1.5 rounded-full transition-all ${activeImgIdx === i ? 'w-8 bg-cyan-400' : 'w-2 bg-white/40'}`} />
                   ))}
                 </div>
-                <button 
-                  onClick={() => setSelectedProperty(null)} 
-                  className="hidden md:flex absolute top-8 left-8 size-14 bg-white rounded-full items-center justify-center shadow-2xl hover:scale-110 transition-transform"
-                ><X /></button>
+                {/* Booked Overlay inside modal too */}
+                {selectedProperty.isBooked && (
+                  <div className="absolute top-8 left-8 bg-red-500/90 text-white font-black px-4 py-2 rounded-xl tracking-widest uppercase border border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.5)]">
+                    BOOKED
+                  </div>
+                )}
               </div>
 
-              {/* Right: Detailed Info */}
-              <div className="md:w-1/2 p-8 md:p-14 overflow-y-auto custom-scrollbar">
-                <div className="mb-8">
-                  <div className="flex items-center gap-3 mb-6">
-                    <span className="bg-indigo-50 text-indigo-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">Available Now</span>
-                    <span className="bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-                      <ShieldCheck size={12}/> Verified Owner
-                    </span>
-                  </div>
-                  <h2 className="text-4xl md:text-5xl font-black tracking-tighter mb-4">{selectedProperty.title}</h2>
-                  <div className="flex items-center gap-2 text-slate-400 font-bold mb-8">
-                    <MapPin size={18} className="text-indigo-500" />
-                    <span>{selectedProperty.street}, {selectedProperty.city}</span>
-                    <span className="text-slate-200">|</span>
-                    <span className="text-indigo-600 underline">View on Map</span>
-                  </div>
-                  
-                  <p className="text-slate-500 leading-relaxed mb-10 text-lg">{selectedProperty.desc}</p>
-                  
-                  {/* Features Grid */}
-                  <div className="grid grid-cols-2 gap-4 mb-10">
-                    {[
-                      { icon: <Wifi />, label: 'Fiber Wifi', val: '100 Mbps' },
-                      { icon: <Zap />, label: 'Electricity', val: '24/7 Backup' },
-                      { icon: <Users />, label: 'Tenant Type', val: 'Professionals' },
-                      { icon: <Coffee />, label: 'Furnishing', val: selectedProperty.type },
-                    ].map((feat) => (
-                      <div key={feat.label} className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+              <div className="md:w-1/2 flex flex-col p-8 overflow-y-auto custom-scrollbar bg-zinc-900/90 relative">
+                <button onClick={() => setSelectedProperty(null)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors hidden md:block"><X size={24}/></button>
+                
+                <div className="flex gap-3 mb-4 flex-wrap">
+                  <span className="rounded-full bg-cyan-500/20 text-cyan-400 px-3 py-1 text-[10px] font-black uppercase tracking-widest border border-cyan-500/30">{selectedProperty.category}</span>
+                  <span className="rounded-full bg-indigo-500/20 text-indigo-400 px-3 py-1 text-[10px] font-black uppercase tracking-widest border border-indigo-500/30">{selectedProperty.furnishing}</span>
+                </div>
+                
+                <h2 className="text-3xl font-black tracking-tight mb-2">{selectedProperty.title}</h2>
+                <div className="flex items-center gap-2 text-sm text-zinc-400 font-medium mb-6">
+                  <MapPin size={16} className="text-cyan-400" /> {selectedProperty.street}, {selectedProperty.city}
+                </div>
 
-                        <div className="text-indigo-500 mb-3">{feat.icon}</div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">{feat.label}</p>
-                        <p className="text-sm font-bold">{feat.val}</p>
-                      </div>
-                    ))}
-                  </div>
+                <p className="text-zinc-400 text-sm leading-relaxed mb-8">{selectedProperty.desc}</p>
 
-                  {/* Nearby Highlights */}
-                  <div className="bg-indigo-50/50 p-6 rounded-3xl mb-10">
-                    <p className="text-xs font-black uppercase tracking-widest text-indigo-600 mb-4 flex items-center gap-2">
-                      <MapPin size={14}/> Location Advantage
-                    </p>
-                    <div className="space-y-3">
-                  {selectedProperty.nearby.map((n, i) => (
-                        <div key={`${n}-${i}`} className="flex items-center justify-between text-sm font-bold text-slate-700">
-                          <span>{n}</span>
-                          <span className="text-slate-400 font-medium">~5-10 mins</span>
-                        </div>
-                      ))}
-                    </div>
+                {/* Feature Grid */}
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  {/* Mini Map Placeholder */}
+                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl flex flex-col justify-center gap-2 overflow-hidden relative group">
+                     <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80')] bg-cover opacity-20 grayscale group-hover:grayscale-0 transition-all duration-500"></div>
+                     <div className="relative z-10 flex items-center gap-2 text-cyan-400">
+                       <MapPin size={20} />
+                       <p className="text-xs font-bold text-white">View on Map</p>
+                     </div>
+                  </div>
+                  {/* Availability Card */}
+                  <div className={`border p-4 rounded-2xl flex items-center justify-center gap-3 ${selectedProperty.isBooked ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-green-500/10 border-green-500/20 text-green-400'}`}>
+                     {selectedProperty.isBooked ? <X size={24} /> : <CheckCircle size={24} />}
+                     <div>
+                       <p className="text-[10px] font-black uppercase tracking-widest">Status</p>
+                       <p className="text-sm font-bold">{selectedProperty.isBooked ? 'Currently Booked' : 'Available Now'}</p>
+                     </div>
                   </div>
                 </div>
 
-                {/* Booking Action Card */}
-                <div className="bg-slate-900 p-8 rounded-[3rem] text-white sticky bottom-0">
+                {/* Owner Info & Chat */}
+                <div className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
+                      {selectedProperty.ownerName?.[0]}
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Owner</p>
+                      <p className="text-sm font-bold text-white">{selectedProperty.ownerName}</p>
+                    </div>
+                  </div>
+                  <button className="flex items-center gap-2 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white transition-colors px-4 py-2 rounded-xl text-xs font-bold">
+                    <MessageSquare size={16} /> Chat
+                  </button>
+                </div>
+
+                {/* Booking Section */}
+                <div className="mt-auto bg-black/40 border border-white/5 p-6 rounded-[2rem]">
                   {!paymentSuccess ? (
-                    <div className="flex flex-col gap-6">
-                      <div className="flex justify-between items-center">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex justify-between items-end mb-2">
                         <div>
-                          <p className="text-slate-400 text-[10px] font-black uppercase mb-1">Reservation Fee</p>
-                          <p className="text-4xl font-black tracking-tighter">₹{(selectedProperty.price * 0.1).toLocaleString()}</p>
-                          <p className="text-[10px] text-indigo-400 font-bold mt-1">*Adjustable in first month rent</p>
-                        </div>
-                        <div className="text-right">
-                           <p className="text-slate-400 text-[10px] font-black uppercase mb-1">Full Rent</p>
-                           <p className="text-xl font-bold">₹{selectedProperty.price.toLocaleString()}</p>
+                          <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Monthly Rent</p>
+                          <p className="text-3xl font-black text-white">₹{selectedProperty.price.toLocaleString()}</p>
                         </div>
                       </div>
-                      
                       <button 
-                        disabled={isPaying || selectedProperty.isBooked}
-                        onClick={() => handlePayment(selectedProperty)}
-                        className={`w-full py-5 rounded-[2rem] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 active:scale-95 ${selectedProperty.isBooked ? 'bg-slate-700 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500'}`}
+                        onClick={() => setShowBookingForm(true)}
+                        disabled={selectedProperty.isBooked}
+                        className="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 py-4 rounded-2xl font-bold uppercase tracking-widest text-sm hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50 text-white"
                       >
-                        {isPaying ? <Loader2 className="animate-spin" /> : selectedProperty.isBooked ? 'Already Booked' : 'Pay & Reserve Now'}
+                        {isPaying ? <Loader2 className="animate-spin" /> : 'Book Visit'}
                       </button>
                     </div>
                   ) : (
-                    <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-center py-4">
-                      <CheckCircle size={50} className="text-emerald-400 mx-auto mb-4" />
-                      <h3 className="text-2xl font-black mb-1">Booking Confirmed!</h3>
-                      <p className="text-slate-400 text-sm mb-6">Payment ID: #ST_{Math.floor(Math.random()*100000)}</p>
-                      <div className="flex gap-3">
-                         <button className="flex-1 py-4 bg-white/10 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2">
-                           <Download size={14}/> Invoice
-                         </button>
-                         <button onClick={() => setSelectedProperty(null)} className="flex-1 py-4 bg-indigo-600 rounded-2xl font-black uppercase tracking-widest text-[10px]">Back to Home</button>
-                      </div>
-                    </motion.div>
+                    <div className="text-center py-4">
+                      <CheckCircle size={48} className="text-cyan-400 mx-auto mb-4" />
+                      <h3 className="text-2xl font-black mb-1">Visit Scheduled!</h3>
+                      <p className="text-zinc-400 text-xs mb-6">We have notified the owner.</p>
+                      <button onClick={() => setSelectedProperty(null)} className="w-full bg-white/10 py-3 rounded-xl font-bold uppercase text-xs hover:bg-white/20 transition-colors">Close</button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -534,36 +578,37 @@ export function RentalsPage() {
         )}
       </AnimatePresence>
 
-      {/* --- ADD PROPERTY MODAL (EXISTING UI KEPT) --- */}
+      {/* --- BOOKING FORM MODAL --- */}
       <AnimatePresence>
-        {showAddForm && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-white rounded-[3rem] p-10 w-full max-w-lg relative shadow-2xl">
-              <button onClick={() => setShowAddForm(false)} className="absolute top-8 right-8 text-slate-400 hover:rotate-90 transition-all"><X size={28}/></button>
-              <h2 className="text-3xl font-black mb-2">List Your House</h2>
-              <p className="text-slate-400 text-sm mb-8 font-medium">Join 500+ premium homeowners today.</p>
-              <div className="space-y-4">
-                <div className="h-40 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center text-slate-400 hover:border-indigo-400 hover:bg-indigo-50/30 transition-all cursor-pointer group">
-                  <Camera size={32} className="mb-2 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black uppercase tracking-widest">Drop Photos Here</span>
+        {showBookingForm && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[2.5rem] p-8 w-full max-w-md relative shadow-2xl">
+              <button onClick={() => setShowBookingForm(false)} className="absolute top-6 right-6 text-zinc-400 hover:text-white transition-colors"><X size={20}/></button>
+              <h2 className="text-2xl font-black text-white mb-1">Schedule Visit</h2>
+              <p className="text-zinc-400 text-sm mb-6 font-medium">Leave your details for the owner.</p>
+              
+              <form onSubmit={handleBookingSubmit} className="space-y-4 text-white">
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Your Name</label>
+                  <input required value={bookingData.name} onChange={e=>setBookingData({...bookingData, name: e.target.value})} placeholder="John Doe" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
                 </div>
-                <input type="text" placeholder="Apartment Name / Street" className="w-full p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-indigo-100 font-semibold" />
-                <div className="flex gap-4">
-                  <select className="flex-1 p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-indigo-100 font-semibold">
-                    <option>Hyderabad</option>
-                    <option>Bangalore</option>
-                  </select>
-                  <select className="flex-1 p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-indigo-100 font-semibold">
-                    <option>Apartment</option>
-                    <option>PG</option>
-                  </select>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Phone Number</label>
+                  <input required type="number" value={bookingData.phone} onChange={e=>setBookingData({...bookingData, phone: e.target.value})} placeholder="9999999999" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
                 </div>
-                <div className="flex gap-4">
-                  <input type="number" placeholder="Rent (₹)" className="flex-1 p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-indigo-100 font-semibold" />
-                  <input type="text" placeholder="BHK Type" className="flex-1 p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-indigo-100 font-semibold" />
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Preferred Date</label>
+                  <input required type="date" value={bookingData.date} onChange={e=>setBookingData({...bookingData, date: e.target.value})} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium [color-scheme:dark]" />
                 </div>
-                <button className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest mt-6 shadow-lg shadow-indigo-100 hover:bg-slate-900 transition-all active:scale-95">Submit Listing</button>
-              </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Message (Optional)</label>
+                  <textarea value={bookingData.message} onChange={e=>setBookingData({...bookingData, message: e.target.value})} placeholder="Any specific requirements?" rows={2} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium"></textarea>
+                </div>
+                
+                <button disabled={isBooking} type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-xl font-bold uppercase tracking-widest mt-2 hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50">
+                  {isBooking ? <Loader2 className="animate-spin" /> : 'Confirm Visit'}
+                </button>
+              </form>
             </motion.div>
           </div>
         )}

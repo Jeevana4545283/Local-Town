@@ -1,362 +1,502 @@
-import { useState, useEffect, useMemo } from 'react'
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
-import { api } from '../lib/api'
+import { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
-  Sparkles, Trash2, MapPin, ClipboardList, CheckCircle2, 
-  Loader2, ArrowRight, ShieldCheck, Zap, Navigation, 
-  Globe, Clock, ChevronRight, X, Locate, Droplets, 
-  Hammer, Monitor, Bug, Truck, Wind, Shirt, 
-  Trees, ShieldAlert, AlertTriangle, Star, Search,
-  CreditCard, History, BarChart3, Bot, Compass, PhoneCall
-} from 'lucide-react'
+  Search, MapPin, Star, Heart, 
+  Wrench, X, Loader2, CheckCircle,
+  ArrowUpRight, ShieldCheck, Camera,
+  Clock, Zap, Plus, ChevronLeft
+} from 'lucide-react';
 
-// --- Extended Futuristic Categories ---
-const SERVICE_CATEGORIES = [
-  { id: 'home-cleaning', label: 'Interior Care', icon: <Sparkles size={20} />, desc: 'Deep sanitation', color: 'indigo' },
-  { id: 'waste-management', label: 'Eco Trace', icon: <Trash2 size={20} />, desc: 'Resource recovery', color: 'emerald' },
-  { id: 'electrician', label: 'Power Grid', icon: <Zap size={20} />, desc: 'Wiring & Repairs', color: 'yellow' },
-  { id: 'plumber', label: 'Hydro Flow', icon: <Droplets size={20} />, desc: 'Leaks & Pipes', color: 'blue' },
-  { id: 'carpenter', label: 'Wood Craft', icon: <Hammer size={20} />, desc: 'Furniture & Fix', color: 'orange' },
-  { id: 'ac-repair', label: 'Climate Control', icon: <Wind size={20} />, desc: 'AC & Ventilation', color: 'cyan' },
-  { id: 'appliance', label: 'Systems', icon: <Monitor size={20} />, desc: 'Fridge & Washers', color: 'purple' },
-  { id: 'pest-control', label: 'Bio Shield', icon: <Bug size={20} />, desc: 'Eco-Pest removal', color: 'rose' },
-  { id: 'movers', label: 'Logistics', icon: <Truck size={20} />, desc: 'Shift & Pack', color: 'slate' },
-  { id: 'laundry', label: 'Fabric Care', icon: <Shirt size={20} />, desc: 'Wash & Fold', color: 'sky' },
-  { id: 'gardening', label: 'Flora', icon: <Trees size={20} />, desc: 'Landscape care', color: 'green' },
-  { id: 'security', label: 'Fortress', icon: <ShieldCheck size={20} />, desc: 'CCTV & Guards', color: 'zinc' },
-]
-
-export function ServicesPage() {
-  const [type, setType] = useState<string>('home-cleaning')
-  const [step, setStep] = useState(1)
-  const [address, setAddress] = useState('')
-  const [notes, setNotes] = useState('')
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
-  const [message, setMessage] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isEmergency, setIsEmergency] = useState(false)
-
-  // --- Analytics Mock ---
-  const stats = useMemo(() => ({
-    activeDispatches: 24,
-    avgEta: '18m',
-    demand: 'High',
-    satisfaction: 98.2
-  }), [])
-
-  // Filter logic
-  const filteredServices = SERVICE_CATEGORIES.filter(s => 
-    s.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.desc.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  async function handleSubmit() {
-    if (!address.trim()) {
-      setStatus('error')
-      setMessage('Deployment address is required.')
-      return
-    }
-    setStatus('loading')
-    try {
-      await api.post('/services', { type, address, notes, emergency: isEmergency })
-      setStatus('success')
-      setStep(4) // Confirmation UI
-    } catch (e: any) {
-      setStatus('error')
-      setMessage(e?.response?.data?.message || 'Neural link failed. Retrying...')
-    }
-  }
-
-  return (
-    <div className="min-h-screen bg-[#FDFDFF] text-slate-600 font-light selection:bg-indigo-100">
-      
-      {/* --- FLOATING AMBIENT LIGHTING --- */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-1/4 w-[600px] h-[600px] bg-indigo-200/20 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-1/4 w-[500px] h-[500px] bg-fuchsia-200/20 blur-[100px] rounded-full" />
-      </div>
-
-      <main className="relative z-10 mx-auto max-w-7xl px-6 py-12 lg:py-20">
-        
-        {/* --- HEADER & ANALYTICS DASHBOARD --- */}
-        <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-12 mb-20">
-          <div className="max-w-2xl">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-3 mb-6">
-              <span className="px-3 py-1 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-full">Core Systems v4.0</span>
-              <div className="flex items-center gap-2 text-emerald-500 text-[10px] font-bold">
-                <span className="size-1.5 bg-emerald-500 rounded-full animate-ping" /> Live Telemetry
-              </div>
-            </motion.div>
-            <h1 className="text-5xl lg:text-7xl font-extralight text-slate-900 tracking-tight leading-[0.9] mb-8">
-              Smart <span className="font-normal text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-fuchsia-600">Infrastructure.</span><br />
-              Delivered on Demand.
-            </h1>
-            
-            <div className="relative max-w-md group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-              <input 
-                type="text"
-                placeholder="AI Smart Search (e.g. 'Fix AC leakage')"
-                className="w-full bg-white/60 backdrop-blur-md border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm outline-none focus:ring-4 ring-indigo-500/5 transition-all shadow-sm"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full lg:w-auto">
-            {[
-              { label: 'Active Dispatches', val: stats.activeDispatches, icon: <Navigation size={14}/> },
-              { label: 'Avg Arrival', val: stats.avgEta, icon: <Clock size={14}/> },
-              { label: 'Network Load', val: stats.demand, icon: <Zap size={14}/> },
-              { label: 'Satisfaction', val: `${stats.satisfaction}%`, icon: <Star size={14}/> },
-            ].map((s) => (
-              <div key={s.label} className="p-4 bg-white border border-slate-50 rounded-3xl shadow-sm">
-
-                <div className="text-slate-400 mb-2">{s.icon}</div>
-                <div className="text-xl font-bold text-slate-900">{s.val}</div>
-                <div className="text-[10px] font-black uppercase tracking-tighter text-slate-400">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </header>
-
-        <div className="grid lg:grid-cols-12 gap-12">
-          
-          {/* --- LEFT: SERVICE GRID --- */}
-          <section className="lg:col-span-7 xl:col-span-8">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                <Compass className="size-4" /> Available Protocols
-              </h3>
-              <button 
-                onClick={() => setIsEmergency(!isEmergency)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${isEmergency ? 'bg-rose-500 text-white shadow-lg shadow-rose-200' : 'bg-rose-50 text-rose-500 hover:bg-rose-100'}`}
-              >
-                <AlertTriangle size={14} /> EMERGENCY MODE
-              </button>
-            </div>
-            
-            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              <AnimatePresence mode="popLayout">
-                {filteredServices.map((service) => (
-                  <ThinServiceCard 
-                    key={service.id}
-                    active={type === service.id} 
-                    onClick={() => { setType(service.id); setStep(1); }}
-                    icon={service.icon}
-                    title={service.label}
-                    desc={service.desc}
-                  />
-                ))}
-              </AnimatePresence>
-            </div>
-          </section>
-
-          {/* --- RIGHT: INTERACTIVE COMMAND CENTER --- */}
-          <aside className="lg:col-span-5 xl:col-span-4">
-            <div className="sticky top-12 space-y-6">
-              
-              <div className="bg-white/80 backdrop-blur-2xl border border-white rounded-[2.5rem] p-8 shadow-2xl shadow-indigo-100/50 relative overflow-hidden">
-                {/* Step Progress Indicator */}
-                <div className="flex gap-1 mb-8">
-                  {[1, 2, 3].map((i) => (
-                    <div key={`step-${i}`} className={`h-1 flex-1 rounded-full transition-all duration-500 ${step >= i ? 'bg-indigo-500' : 'bg-slate-100'}`} />
-                  ))}
-
-                </div>
-
-                <AnimatePresence mode="wait">
-                  {step === 1 && (
-                    <motion.div key="s1" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
-                      <div className="space-y-2">
-                        <h2 className="text-xl font-medium text-slate-900">Set Destination</h2>
-                        <p className="text-xs text-slate-400">Specify the deployment coordinate for your agent.</p>
-                      </div>
-                      <div className="relative group">
-                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400 group-focus-within:text-indigo-500" />
-                        <input 
-                          className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm outline-none focus:ring-4 ring-indigo-500/5 transition-all"
-                          placeholder="Search address..."
-                          value={address}
-                          onChange={(e) => setAddress(e.target.value)}
-                        />
-                        <button className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-white rounded-xl shadow-sm hover:scale-105 transition-transform"><Locate size={14} className="text-indigo-500"/></button>
-                      </div>
-                      <button onClick={() => setStep(2)} className="w-full py-5 bg-slate-900 text-white rounded-[1.5rem] text-xs font-black tracking-[0.2em] hover:bg-indigo-600 transition-all flex items-center justify-center gap-3">
-                        INITIALIZE DISPATCH <ArrowRight size={14} />
-                      </button>
-                    </motion.div>
-                  )}
-
-                  {step === 2 && (
-                    <motion.div key="s2" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
-                      <div className="space-y-2">
-                        <h2 className="text-xl font-medium text-slate-900">Contextual Notes</h2>
-                        <p className="text-xs text-slate-400">Add instructions for secure agent entry.</p>
-                      </div>
-                      <textarea 
-                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 text-sm outline-none focus:ring-4 ring-indigo-500/5 min-h-[140px] transition-all"
-                        placeholder="Gate codes, pet presence, or urgent details..."
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                      />
-                      <div className="flex gap-3">
-                        <button onClick={() => setStep(1)} className="flex-1 py-5 border border-slate-100 rounded-[1.5rem] text-[10px] font-black tracking-widest text-slate-400">BACK</button>
-                        <button onClick={() => setStep(3)} className="flex-[2] py-5 bg-slate-900 text-white rounded-[1.5rem] text-[10px] font-black tracking-widest">CONTINUE</button>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {step === 3 && (
-                    <motion.div key="s3" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
-                      <div className="p-6 bg-slate-900 text-white rounded-3xl space-y-4">
-                        <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-indigo-300">
-                          <span>Quote Estimate</span>
-                          <ShieldCheck size={14}/>
-                        </div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-3xl font-light">₹</span>
-                          <span className="text-4xl font-bold">499</span>
-                          <span className="text-xs text-slate-400 ml-2">Estimated</span>
-                        </div>
-                        <div className="pt-4 border-t border-white/10 text-[10px] space-y-2">
-                          <div className="flex justify-between"><span>Base Rate</span><span>₹399</span></div>
-                          <div className="flex justify-between"><span>System Fee</span><span>₹100</span></div>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={handleSubmit}
-                        disabled={status === 'loading'}
-                        className="w-full py-5 bg-indigo-600 text-white rounded-[1.5rem] text-xs font-black tracking-[0.2em] shadow-xl shadow-indigo-200 flex items-center justify-center gap-3"
-                      >
-                        {status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : 'CONFIRM & DEPLOY'}
-                      </button>
-                    </motion.div>
-                  )}
-
-                  {step === 4 && (
-                    <motion.div key="s4" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-6 space-y-6">
-                      <div className="size-20 bg-emerald-50 text-emerald-500 rounded-full mx-auto flex items-center justify-center border border-emerald-100 shadow-inner">
-                        <CheckCircle2 size={32} />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-medium text-slate-900 mb-1">Dispatch Confirmed</h2>
-                        <p className="text-xs text-slate-400">Agent ID #9822 assigned. ETA: 12 mins.</p>
-                      </div>
-                      <div className="h-40 bg-slate-100 rounded-3xl flex items-center justify-center relative overflow-hidden">
-                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10" />
-                         <Navigation className="text-indigo-500 animate-bounce" size={24} />
-                         <span className="absolute bottom-4 text-[10px] font-black uppercase tracking-widest">Routing Agent...</span>
-                      </div>
-                      <button 
-                        onClick={() => {setStep(1); setStatus('idle'); setAddress('');}}
-                        className="text-[10px] font-black text-indigo-500 underline uppercase tracking-widest"
-                      >
-                        Book another service
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* AI Assistant Widget */}
-              <div className="p-6 bg-indigo-50/50 border border-indigo-100 rounded-[2rem] flex items-start gap-4">
-                <div className="size-10 bg-white rounded-2xl flex items-center justify-center shadow-sm text-indigo-600 shrink-0">
-                  <Bot size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-1">AI Assistant</p>
-                  <p className="text-xs leading-relaxed text-indigo-900/70">"Based on your history, you might need <b>Hydro Flow</b> service. High pressure detected in your sector."</p>
-                </div>
-              </div>
-            </div>
-          </aside>
-        </div>
-
-        {/* --- EXTRA FEATURES SECTION --- */}
-        <section className="mt-32 space-y-12">
-           <div className="flex items-center justify-between">
-              <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Operational Integrity</h2>
-              <div className="flex gap-2">
-                <button className="p-3 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors"><History size={16}/></button>
-                <button className="p-3 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors"><CreditCard size={16}/></button>
-              </div>
-           </div>
-
-           <div className="grid md:grid-cols-3 gap-6">
-              {[
-                { title: 'Global Dispatches', val: '1.2M+', trend: '+12%', icon: <Globe size={18}/> },
-                { title: 'Response Time', val: '14m 20s', trend: '-2m', icon: <Clock size={18}/> },
-                { title: 'Satisfaction Index', val: '4.92/5', trend: '+0.1', icon: <Star size={18}/> },
-              ].map((card, i) => (
-                <div key={i} className="p-8 bg-white border border-slate-50 rounded-[2.5rem] shadow-sm flex items-center justify-between group hover:shadow-xl hover:translate-y-[-4px] transition-all duration-500">
-                  <div>
-                    <div className="text-slate-400 mb-3">{card.icon}</div>
-                    <div className="text-2xl font-bold text-slate-900">{card.val}</div>
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{card.title}</div>
-                  </div>
-                  <div className={`text-[10px] font-black px-2 py-1 rounded-lg ${card.trend.startsWith('+') ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                    {card.trend}
-                  </div>
-                </div>
-              ))}
-           </div>
-        </section>
-
-      </main>
-
-      {/* Footer Meta */}
-      <footer className="max-w-7xl mx-auto px-6 py-12 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6">
-        <p className="text-[10px] font-medium text-slate-400 tracking-widest uppercase">Urban Hub © 2026. Global Service Protocol v4.2.1</p>
-        <div className="flex gap-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-          <a href="#" className="hover:text-indigo-600 transition-colors">Privacy</a>
-          <a href="#" className="hover:text-indigo-600 transition-colors">Nodes</a>
-          <a href="#" className="hover:text-indigo-600 transition-colors">Support</a>
-        </div>
-      </footer>
-    </div>
-  )
+// --- Enhanced Types ---
+interface Service {
+  id: string;
+  title: string;
+  price: number;
+  city: string;
+  street: string;
+  category: 'Electrician' | 'Plumber' | 'Carpenter' | 'Appliance' | 'Painter' | 'Cleaner';
+  type: 'Hourly' | 'Fixed';
+  nearby: string[];
+  rating: number;
+  reviewsCount: number;
+  img: string[];
+  desc: string;
+  isBooked: boolean;
+  isVerified: boolean;
+  amenities: string[];
+  phone?: string;
 }
 
-// --- High-Performance Lightweight Service Card ---
-function ThinServiceCard({ active, onClick, icon, title, desc }: any) {
-  return (
-    <motion.div
-      layout
-      onClick={onClick}
-      whileTap={{ scale: 0.97 }}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className={`
-        relative cursor-pointer overflow-hidden rounded-[2rem] p-6 transition-all duration-300 border
-        ${active 
-          ? 'bg-white border-indigo-400 shadow-[0_20px_50px_-20px_rgba(79,70,229,0.2)]' 
-          : 'bg-white/40 border-slate-100 hover:border-slate-200'
+export function ServicesPage() {
+  const [properties, setProperties] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedProperty, setSelectedProperty] = useState<Service | null>(null);
+  const [isPaying, setIsPaying] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
+
+  // --- Booking Form State ---
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [bookingData, setBookingData] = useState({ name: '', phone: '', date: '', message: '' });
+  const [isBooking, setIsBooking] = useState(false);
+
+  const getUserId = () => {
+    let id = localStorage.getItem('lt_guest_id')
+    if (!id) {
+      id = 'guest-' + Math.random().toString(36).substr(2, 9)
+      localStorage.setItem('lt_guest_id', id)
+    }
+    return id
+  }
+
+  const navigate = useNavigate();
+
+  // --- Advanced Filter State ---
+  const [filters, setFilters] = useState({
+    city: 'All',
+    category: 'All',
+    type: 'All',
+    budget: 5000,
+  });
+
+  useEffect(() => {
+    fetch('http://localhost:4000/api/services')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.items) {
+          const mapped: Service[] = data.items.map((w: any) => ({
+            id: w.id,
+            title: w.name || 'Unknown Service',
+            price: w.hourlyRate || 0,
+            city: w.address?.split(',')[0] || 'Unknown',
+            street: w.address || '',
+            category: w.profession || 'Other',
+            type: 'Hourly',
+            nearby: w.nearbyAreas || [],
+            rating: 4.8,
+            reviewsCount: Math.floor(Math.random() * 50) + 10,
+            img: w.imageUrls?.length ? w.imageUrls : ['https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&q=80'],
+            desc: w.description || 'Professional service ready to help.',
+            isBooked: w.status !== 'Available',
+            isVerified: true,
+            amenities: [],
+            phone: w.phone || ''
+          }));
+          setProperties(mapped);
         }
-      `}
-    >
-      <div className={`size-12 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500
-        ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-slate-50 text-slate-400'}
-      `}>
-        {icon}
-      </div>
-      <div className="space-y-1">
-        <h3 className={`text-sm font-medium ${active ? 'text-slate-900' : 'text-slate-500'}`}>{title}</h3>
-        <p className="text-[11px] text-slate-400 font-normal">{desc}</p>
+      })
+      .catch((err) => console.error("Failed to load services:", err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // --- Smart Search & Filtering Logic ---
+  const filteredProperties = useMemo(() => {
+    return properties.filter(p => {
+      const matchesSearch = 
+        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.street.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.nearby.some(n => n.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const matchesCity = filters.city === 'All' || p.city === filters.city;
+      const matchesCategory = filters.category === 'All' || p.category === filters.category;
+      const matchesType = filters.type === 'All' || p.type === filters.type;
+      const matchesBudget = p.price <= filters.budget;
+
+      return matchesSearch && matchesCity && matchesCategory && matchesType && matchesBudget;
+    });
+  }, [properties, searchQuery, filters]);
+
+  // --- Functions ---
+  const toggleFavorite = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  };
+
+  const handleBookingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProperty) return;
+    
+    setIsBooking(true);
+    try {
+      const res = await fetch('http://localhost:4000/api/services-bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: selectedProperty.id,
+          userName: bookingData.name || 'Guest',
+          userPhone: bookingData.phone || '0000000000',
+          visitDate: bookingData.date || new Date().toISOString(),
+          message: bookingData.message,
+          userId: getUserId()
+        })
+      });
+      if (res.ok) {
+        setPaymentSuccess(true);
+        setShowBookingForm(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsBooking(false);
+    }
+  };
+
+  return (
+    <div className="relative h-screen w-screen overflow-hidden bg-zinc-950 font-sans text-white">
+      
+      {/* --- PREMIUM BACKGROUND --- */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900" />
+        <div className="absolute -left-32 -top-32 size-[40rem] rounded-full bg-cyan-500/20 blur-[100px]" />
+        <div className="absolute -right-32 bottom-0 size-[40rem] rounded-full bg-purple-500/20 blur-[100px]" />
+        <div className="absolute left-1/3 top-1/2 size-[30rem] -translate-y-1/2 rounded-full bg-indigo-500/10 blur-[100px]" />
       </div>
 
-      {active && (
-        <motion.div 
-          layoutId="active-indicator" 
-          className="absolute top-4 right-4 text-indigo-500"
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-        >
-          <CheckCircle2 size={16} />
-        </motion.div>
-      )}
-    </motion.div>
-  )
+      {/* --- MAIN GLASS CONTAINER --- */}
+      <div className="relative z-10 flex h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] m-4 overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] backdrop-blur-2xl">
+        
+        {/* --- LEFT SIDEBAR --- */}
+        <aside className="flex w-[260px] flex-col border-r border-white/10 bg-black/20 p-6">
+          <div className="mb-10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg">
+                <Wrench size={18} />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-white">LocalTown</span>
+            </div>
+            <button onClick={() => navigate(-1)} className="grid size-8 place-items-center rounded-full bg-white/5 hover:bg-white/10 transition">
+              <ChevronLeft size={18} className="text-zinc-300" />
+            </button>
+          </div>
+
+          {/* Filters Sidebar */}
+          <div className="flex flex-1 flex-col gap-8 overflow-y-auto custom-scrollbar pr-2 mt-4">
+            
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Trade Category</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Electrician', 'Plumber', 'Carpenter', 'Appliance', 'Painter', 'Cleaner'].map(c => (
+                  <label key={c} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, category: c})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.category === c ? 'border-cyan-500 bg-cyan-500/20 text-cyan-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.category === c && <div className="size-2.5 rounded-sm bg-cyan-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.category === c ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{c}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Rate Type</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Hourly', 'Fixed'].map(t => (
+                  <label key={t} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, type: t})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.type === t ? 'border-indigo-500 bg-indigo-500/20 text-indigo-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.type === t && <div className="size-2.5 rounded-sm bg-indigo-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.type === t ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{t === 'All' ? 'Any' : t}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Max Rate: ₹{filters.budget.toLocaleString()}</p>
+              <input 
+                type="range" min="100" max="5000" step="100" 
+                value={filters.budget}
+                onChange={(e) => setFilters({...filters, budget: parseInt(e.target.value)})}
+                className="w-full accent-cyan-500"
+              />
+              <div className="flex justify-between mt-2 text-xs text-zinc-500 font-bold">
+                <span>₹100</span>
+                <span>₹5K+</span>
+              </div>
+            </div>
+
+          </div>
+
+          <button 
+            onClick={() => setShowAddForm(true)}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:scale-105"
+          >
+            <Plus size={18}/> List Service
+          </button>
+        </aside>
+
+        {/* --- RIGHT CONTENT AREA --- */}
+        <main className="flex flex-1 flex-col overflow-y-auto custom-scrollbar relative">
+          
+          <header className="sticky top-0 z-50 border-b border-white/10 bg-white/5 backdrop-blur-xl px-8 py-6 flex flex-col md:flex-row gap-6 md:items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-black text-white">Find verified pros</h1>
+              <p className="mt-1 text-sm font-medium text-zinc-400">Discover premium experts in your area.</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10 w-[300px]">
+                <Search size={18} className="text-zinc-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search skills, name..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent text-sm font-medium text-white placeholder-zinc-500 outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10">
+                <MapPin size={18} className="text-zinc-400" />
+                <select 
+                  onChange={(e) => setFilters({...filters, city: e.target.value})}
+                  className="w-[120px] bg-transparent text-sm font-medium text-white outline-none appearance-none"
+                >
+                  <option className="bg-zinc-900" value="All">All Cities</option>
+                  <option className="bg-zinc-900" value="Hyderabad">Hyderabad</option>
+                  <option className="bg-zinc-900" value="Bangalore">Bangalore</option>
+                  <option className="bg-zinc-900" value="Pune">Pune</option>
+                </select>
+              </div>
+            </div>
+          </header>
+
+          <div className="p-8">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex gap-4">
+                {['Top Rated', 'Available Now', 'Experts'].map((tab, i) => (
+                  <span key={tab} className={`text-sm font-bold cursor-pointer transition-colors ${i === 0 ? 'text-cyan-400 border-b-2 border-cyan-400 pb-1' : 'text-zinc-500 hover:text-zinc-300'}`}>{tab}</span>
+                ))}
+              </div>
+              <p className="text-sm font-medium text-zinc-500">{filteredProperties.length} Pros Found</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredProperties.map((p, idx) => (
+                <motion.div 
+                  key={p.id} 
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.05 }}
+                  whileHover={{ y: -8 }}
+                  onClick={() => { setSelectedProperty(p); setPaymentSuccess(false); setActiveImgIdx(0); }}
+                  className={`group relative flex flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-md cursor-pointer transition-all hover:bg-white/10 hover:shadow-cyan-500/10 ${p.isBooked ? 'opacity-60' : ''}`}
+                >
+                  <div className="relative h-64 overflow-hidden">
+                    <img src={p.img[0]} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    
+                    <div className="absolute left-4 top-4 flex flex-col gap-2">
+                      {p.isBooked && <span className="rounded-full bg-red-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm">Busy Now</span>}
+                      {p.isVerified && <span className="flex items-center gap-1 rounded-full bg-cyan-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm"><ShieldCheck size={12}/> Verified</span>}
+                    </div>
+
+                    <div className="absolute right-4 top-4">
+                      <button 
+                        onClick={(e) => toggleFavorite(e, p.id)}
+                        className={`grid size-10 place-items-center rounded-full backdrop-blur-md transition-all border border-white/20 ${favorites.includes(p.id) ? 'bg-red-500/90 text-white' : 'bg-black/40 text-white hover:bg-black/60'}`}
+                      >
+                        <Heart size={18} fill={favorites.includes(p.id) ? "currentColor" : "none"} />
+                      </button>
+                    </div>
+
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h3 className="text-xl font-bold leading-tight text-white">{p.title}</h3>
+                      <p className="mt-1 flex items-center gap-1 text-sm font-medium text-zinc-300">
+                        <MapPin size={14} className="text-cyan-400" /> {p.street}, {p.city}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-6">
+                    <div className="mb-6 flex items-center justify-between">
+                      <div className="flex flex-wrap gap-2">
+                        {p.amenities.slice(0,3).map(a => (
+                          <span key={a} className="rounded-lg bg-white/10 px-2 py-1 text-[10px] font-bold text-zinc-300 border border-white/5">{a}</span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-xs font-bold text-yellow-400 border border-white/5">
+                        <Star size={12} fill="currentColor" /> {p.rating}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto flex items-end justify-between border-t border-white/10 pt-4">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{p.type} Rate</p>
+                        <div className="text-2xl font-black text-white">₹{p.price.toLocaleString()}</div>
+                      </div>
+                      <button className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg transition-transform group-hover:scale-110">
+                        <ArrowUpRight size={22} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* --- ADD PROPERTY MODAL --- */}
+      <AnimatePresence>
+        {showAddForm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[3rem] p-10 w-full max-w-lg relative shadow-2xl">
+              <button onClick={() => setShowAddForm(false)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors"><X size={24}/></button>
+              <h2 className="text-3xl font-black mb-2">List Your Service</h2>
+              <p className="text-zinc-400 text-sm mb-8 font-medium">Join 500+ premium pros today.</p>
+              
+              <div className="space-y-4">
+                <div className="h-32 border-2 border-dashed border-white/20 bg-white/5 rounded-3xl flex flex-col items-center justify-center text-zinc-400 hover:border-cyan-400 hover:text-cyan-400 transition-colors cursor-pointer group">
+                  <Camera size={28} className="mb-2" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Drop Photos Here</span>
+                </div>
+                <input type="text" placeholder="Your Name / Business" className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
+                <div className="flex gap-4">
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Hyderabad</option>
+                    <option>Bangalore</option>
+                  </select>
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Electrician</option>
+                    <option>Plumber</option>
+                  </select>
+                </div>
+                <div className="flex gap-4">
+                  <input type="number" placeholder="Rate (₹)" className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
+                </div>
+                <button className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-2xl font-bold uppercase tracking-widest mt-4 hover:shadow-lg hover:shadow-cyan-500/20 transition-all">Submit Profile</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- DETAILED BOOKING MODAL --- */}
+      <AnimatePresence>
+        {selectedProperty && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xl">
+            <motion.div 
+              layoutId={selectedProperty.id} 
+              className="bg-zinc-900 border border-white/10 rounded-[2.5rem] w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl relative"
+            >
+              <button onClick={() => setSelectedProperty(null)} className="absolute top-4 right-4 z-50 grid size-10 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md md:hidden"><X size={18}/></button>
+
+              <div className="md:w-1/2 relative bg-black">
+                <img src={selectedProperty.img[activeImgIdx]} className="w-full h-full object-cover opacity-90" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-zinc-900/50 hidden md:block" />
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
+                  {selectedProperty.img.map((img, i) => (
+                    <button key={i} onClick={() => setActiveImgIdx(i)} className={`h-1.5 rounded-full transition-all ${activeImgIdx === i ? 'w-8 bg-cyan-400' : 'w-2 bg-white/40'}`} />
+                  ))}
+                </div>
+              </div>
+
+              <div className="md:w-1/2 flex flex-col p-8 overflow-y-auto custom-scrollbar bg-zinc-900/90 relative">
+                <button onClick={() => setSelectedProperty(null)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors hidden md:block"><X size={24}/></button>
+                
+                <div className="flex gap-3 mb-4">
+                  <span className="rounded-full bg-cyan-500/20 text-cyan-400 px-3 py-1 text-[10px] font-black uppercase tracking-widest border border-cyan-500/30">Available Now</span>
+                </div>
+                
+                <h2 className="text-3xl font-black tracking-tight mb-2">{selectedProperty.title}</h2>
+                <div className="flex items-center gap-2 text-sm text-zinc-400 font-medium mb-6">
+                  <MapPin size={16} className="text-cyan-400" /> {selectedProperty.street}, {selectedProperty.city}
+                </div>
+
+                <p className="text-zinc-400 text-sm leading-relaxed mb-8">{selectedProperty.desc}</p>
+
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  {[
+                    { icon: <Wrench />, label: 'Skills', val: selectedProperty.category },
+                    { icon: <Zap />, label: 'Speed', val: 'Fast Response' },
+                    { icon: <Clock />, label: 'Type', val: selectedProperty.type },
+                  ].map((feat) => (
+                    <div key={feat.label} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center gap-4">
+                      <div className="text-cyan-400">{feat.icon}</div>
+                      <div>
+                        <p className="text-[10px] font-black text-zinc-500 uppercase">{feat.label}</p>
+                        <p className="text-sm font-bold">{feat.val}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-auto bg-black/40 border border-white/5 p-6 rounded-[2rem]">
+                  {!paymentSuccess ? (
+                    <div className="flex flex-col gap-4">
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Booking Fee</p>
+                          <p className="text-3xl font-black text-white">₹{(selectedProperty.price * 0.1).toLocaleString()}</p>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Base Rate</p>
+                           <p className="text-lg font-bold text-zinc-300">₹{selectedProperty.price.toLocaleString()}</p>
+                        </div>
+                      </div>
+                        <button 
+                          onClick={() => setShowBookingForm(true)}
+                          disabled={selectedProperty.isBooked}
+                          className="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 py-4 rounded-2xl font-bold uppercase tracking-widest text-sm hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50 text-white"
+                        >
+                        {isPaying ? <Loader2 className="animate-spin" /> : 'Hire Professional'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <CheckCircle size={48} className="text-cyan-400 mx-auto mb-4" />
+                      <h3 className="text-2xl font-black mb-1">Hired Successfully!</h3>
+                      <p className="text-zinc-400 text-xs mb-6">Booking ID: #WK_{Math.floor(Math.random()*100000)}</p>
+                      <button onClick={() => setSelectedProperty(null)} className="w-full bg-white/10 py-3 rounded-xl font-bold uppercase text-xs hover:bg-white/20 transition-colors">Close</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- BOOKING FORM MODAL --- */}
+      <AnimatePresence>
+        {showBookingForm && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[2.5rem] p-8 w-full max-w-md relative shadow-2xl">
+              <button onClick={() => setShowBookingForm(false)} className="absolute top-6 right-6 text-zinc-400 hover:text-white transition-colors"><X size={20}/></button>
+              <h2 className="text-2xl font-black text-white mb-1">Request Service</h2>
+              <p className="text-zinc-400 text-sm mb-6 font-medium">Leave your details for the provider.</p>
+              
+              <form onSubmit={handleBookingSubmit} className="space-y-4 text-white">
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Your Name</label>
+                  <input required value={bookingData.name} onChange={e=>setBookingData({...bookingData, name: e.target.value})} placeholder="John Doe" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Phone Number</label>
+                  <input required type="number" value={bookingData.phone} onChange={e=>setBookingData({...bookingData, phone: e.target.value})} placeholder="9999999999" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Preferred Date</label>
+                  <input required type="date" value={bookingData.date} onChange={e=>setBookingData({...bookingData, date: e.target.value})} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium [color-scheme:dark]" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Message (Optional)</label>
+                  <textarea value={bookingData.message} onChange={e=>setBookingData({...bookingData, message: e.target.value})} placeholder="Any specific requirements?" rows={2} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium"></textarea>
+                </div>
+                
+                <button disabled={isBooking} type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-xl font-bold uppercase tracking-widest mt-2 hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50">
+                  {isBooking ? <Loader2 className="animate-spin" /> : 'Confirm Request'}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
 }

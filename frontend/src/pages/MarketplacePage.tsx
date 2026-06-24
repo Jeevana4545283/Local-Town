@@ -1,913 +1,489 @@
-import { useEffect, useState, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Search,
-  MapPin,
-  Plus,
-  X,
-  Camera,
-  Sparkles,
-  Navigation,
-  Crosshair,
-  Target,
-  Heart,
-  TrendingUp,
-  ShieldCheck,
-  Filter,
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Search, MapPin, Star, Heart, 
+  Landmark, X, Loader2, CheckCircle,
+  ArrowUpRight, ShieldCheck, Camera,
+  Map, Building2, Trees, Plus, ChevronLeft
+} from 'lucide-react';
 
-  Compass,
-  Check,
-  Phone,
-  MessageSquare,
-  Zap,
-  Droplet,
-  ArrowRight,
-  BarChart3,
-  Landmark,
-  ChevronRight
-} from 'lucide-react'
-
-// --- Extended Luxury Types ---
-type Listing = {
-  _id: string
-  category: 'Plot' | 'Villa' | 'Commercial' | 'Farmland' | 'Gated Community'
-  title: string
-  seller: string
-  location: string
-  street: string
-  price: number 
-  sqyd: number
-  sqft: number
-  acres: number
-  lengthMeters: number
-  widthMeters: number
-  roadWidthFt: number
-  waterAvailable: boolean
-  electricityAvailable: boolean
-  verified: boolean
-  images: string[]
-  distance: string
-  roi: string
-  appreciation: number
-  landmarks: string[]
-  dimensions: string
-  facing: 'East' | 'West' | 'North' | 'South' | 'Corner'
-  investmentScore: number
-  readyToConstruct: boolean
-  tags: string[]
-  amenities: string[]
-  infrastructure: {
-    schools: string
-    hospitals: string
-    itParks: string
-    transit: string
-    lifestyle: string
-  }
+// --- Enhanced Types ---
+interface Asset {
+  id: string;
+  title: string;
+  price: number;
+  city: string;
+  street: string;
+  category: 'Plot' | 'Gated Community' | 'Farmland' | 'Villa' | 'Commercial';
+  type: 'Freehold' | 'Leasehold';
+  nearby: string[];
+  rating: number;
+  reviewsCount: number;
+  img: string[];
+  desc: string;
+  isBooked: boolean;
+  isVerified: boolean;
+  amenities: string[];
+  roi: string;
 }
+
+
+import { useEffect } from 'react';
 
 export function MarketplacePage() {
-  const [items, setItems] = useState<Listing[]>([])
-  const [activeCategory, setActiveCategory] = useState('All')
-  const [isAddOpen, setIsAddOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortOrder, setSortOrder] = useState<'high' | 'low' | 'roi' | 'new'>('new')
-  
-  // Advanced Filter States
-  const [showFilters, setShowFilters] = useState(false)
-  const [filterBudget, setFilterBudget] = useState<number>(50000000)
-  const [filterFacing, setFilterFacing] = useState<string>('All')
-  const [filterVerified, setFilterVerified] = useState<boolean>(false)
-  // bookingStep/filters state in this page is UI-only; keep only used setters
+  const [properties, setProperties] = useState<Asset[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<Asset | null>(null);
+  const [isPaying, setIsPaying] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
 
-  const [filterGated] = useState<boolean>(false)
-  const [filterReady] = useState<boolean>(false)
+  // --- Booking Form State ---
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [bookingData, setBookingData] = useState({ name: '', phone: '', date: '', message: '' });
+  const [isBooking, setIsBooking] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Modals & Triggers State
-  const [selectedProperty, setSelectedProperty] = useState<Listing | null>(null)
-  const [bookingStep, setBookingStep] = useState<'schedule' | 'payment' | 'confirmed'>('schedule')
-  const [reservedPlots, setReservedPlots] = useState<string[]>([])
+  const getUserId = () => {
+    let id = localStorage.getItem('lt_guest_id')
+    if (!id) {
+      id = 'guest-' + Math.random().toString(36).substr(2, 9)
+      localStorage.setItem('lt_guest_id', id)
+    }
+    return id
+  }
 
-  const [compareList, setCompareList] = useState<string[]>([])
-  const [favorites, setFavorites] = useState<string[]>([])
+  const navigate = useNavigate();
 
+  // --- Advanced Filter State ---
+  const [filters, setFilters] = useState({
+    city: 'All',
+    category: 'All',
+    type: 'All',
+  });
 
   useEffect(() => {
-    // Premium dynamic dataset optimized for ultra-rich detailed view
-    setItems([
-      { 
-        _id: '1', 
-        category: 'Plot', 
-        title: 'North-Facing Premium Corner Plot', 
-        seller: 'HNTDA Approved Authority', 
-        location: 'Green Valley', 
-        street: 'NSP Canal Corridor Rd',
-        price: 4850000, 
-        sqyd: 166,
-        sqft: 1500, 
-        acres: 0.034,
-        lengthMeters: 13.1,
-        widthMeters: 10.6,
-        roadWidthFt: 40,
-        waterAvailable: true,
-        electricityAvailable: true,
-        verified: true, 
-        images: [
-          'https://images.unsplash.com/photo-1500382017468-9049fee74a62?q=80&w=1000',
-          'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1000',
-          'https://images.unsplash.com/photo-1464234470469-98538b841703?q=80&w=1000'
-        ], 
-        distance: '0.4 km',
-        roi: '12.4% ARR',
-        appreciation: 18.5,
-        landmarks: ['Highway 65 Junction', 'Global Tech International School'],
-        dimensions: '35 x 43 ft',
-        facing: 'Corner',
-        investmentScore: 94,
-        readyToConstruct: true,
-        tags: ['HNTDA approved plots', 'corner plots', 'highway-facing plots'],
-        amenities: ['24/7 Surveillance Grid', 'Underground Optical Fiber', 'Rainwater Harvesting Pit', 'Premium Blacktop Roads'],
-        infrastructure: {
-          schools: 'Global Tech International (0.2 km), St. Marys Academy (1.5 km)',
-          hospitals: 'NSP Multi-Specialty Core (1.2 km), Apollo Clinic (3.0 km)',
-          itParks: 'Miryalaguda Tech Hub Phase 1 (2.5 km)',
-          transit: 'Highway 65 Express Node (0.5 km), Central Bus Terminus (4.0 km)',
-          lifestyle: 'Green Valley Country Club (0.8 km), Grand Arcade Mall (2.1 km)'
+    fetch('http://localhost:4000/api/marketplace')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.items) {
+          const mapped: Asset[] = data.items.map((m: any) => ({
+            id: m.id,
+            title: m.title || 'Unknown Asset',
+            price: m.itemPrice || 0,
+            city: m.address?.split(',')[0] || 'Unknown',
+            street: m.address || '',
+            category: 'Commercial',
+            type: 'Freehold',
+            nearby: m.nearbyAreas || [],
+            rating: 4.8,
+            reviewsCount: Math.floor(Math.random() * 50) + 10,
+            img: m.imageUrls?.length ? m.imageUrls : ['https://images.unsplash.com/photo-1500382017468-9049fee74a62?auto=format&fit=crop&q=80'],
+            desc: m.description || 'Premium asset.',
+            isBooked: m.status !== 'Available',
+            isVerified: true,
+            amenities: [],
+            roi: '8.5%'
+          }));
+          setProperties(mapped);
         }
-      },
-      { 
-        _id: '2', 
-        category: 'Gated Community', 
-        title: 'The Boulevard Estate Enclave', 
-        seller: 'Zenith Premium Holdings', 
-        location: 'Sagar Road', 
-        street: 'Avenue 4 Prime Alpha',
-        price: 18500000, 
-        sqyd: 444,
-        sqft: 4000, 
-        acres: 0.091,
-        lengthMeters: 24.3,
-        widthMeters: 15.2,
-        roadWidthFt: 60,
-        waterAvailable: true,
-        electricityAvailable: true,
-        verified: true, 
-        images: [
-          'https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=1000',
-          'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1000',
-          'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1000'
-        ], 
-        distance: '1.2 km',
-        roi: '14.2% ARR',
-        appreciation: 22.1,
-        landmarks: ['KIMS Elite Hospital', 'Outer Ring Road Touch'],
-        dimensions: '50 x 80 ft',
-        facing: 'East',
-        investmentScore: 98,
-        readyToConstruct: true,
-        tags: ['gated community plots', 'east-facing plots', 'premium ventures'],
-        amenities: ['Architectural Entrance Plaza', 'Clubhouse & Hydro-Spa', 'Solar Smart Microgrid', 'Encapsulated Drainage Line'],
-        infrastructure: {
-          schools: 'Delhi Public School Campus (2.0 km), Oakridge International (5.5 km)',
-          hospitals: 'KIMS Sovereign Hospital (0.4 km), Sunshine Medical Zone (1.8 km)',
-          itParks: 'Sagar High-Growth Tech Park (3.2 km)',
-          transit: 'ORR Interchange Section (0.2 km), Metro Terminal Planned (1.5 km)',
-          lifestyle: 'The Pavilion Elite Club (Inside), Capital Galleria (1.0 km)'
-        }
-      },
-      { 
-        _id: '3', 
-        category: 'Farmland', 
-        title: 'Sandalwood Managed Agro Farms', 
-        seller: 'Pioneer Eco Assets', 
-        location: 'Yadadri Foothills', 
-        street: 'Valigonda High-Yield Way',
-        price: 6500000, 
-        sqyd: 1210,
-        sqft: 10890, 
-        acres: 0.25,
-        lengthMeters: 36.8,
-        widthMeters: 27.4,
-        roadWidthFt: 33,
-        waterAvailable: true,
-        electricityAvailable: true,
-        verified: true, 
-        images: [
-          'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1000',
-          'https://images.unsplash.com/photo-1500382017468-9049fee74a62?q=80&w=1000',
-          'https://images.unsplash.com/photo-1464234470469-98538b841703?q=80&w=1000'
-        ], 
-        distance: '8.5 km',
-        roi: '16.8% ARR',
-        appreciation: 25.4,
-        landmarks: ['Proposed Regional Ring Road (RRR)'],
-        dimensions: '90 x 121 ft',
-        facing: 'North',
-        investmentScore: 89,
-        readyToConstruct: false,
-        tags: ['farmland', 'investment plots', 'nearby growth areas'],
-        amenities: ['Automated Drip Irrigation Grid', 'Sandalwood Crop Management Cover', 'Fenced Peripheral Border', 'Geothermal Wells'],
-        infrastructure: {
-          schools: 'Pragati Residential Gurukul (4.0 km)',
-          hospitals: 'Rural Emergency Center (2.5 km)',
-          itParks: 'Proposed Agro Tech Incubator Zone (6.0 km)',
-          transit: 'RRR Planned Expressway (1.2 km), Local Rail Station (5.0 km)',
-          lifestyle: 'Yadadri Wellness Resort Cluster (3.5 km)'
-        }
-      }
-    ])
-  }, [])
+      })
+      .catch((err) => console.error("Failed to load marketplace:", err))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const handleAiSearch = (prompt: string) => {
-    setSearchQuery(prompt);
-    if (prompt.toLowerCase().includes('gated')) setActiveCategory('Gated Community');
-    else if (prompt.toLowerCase().includes('farm')) setActiveCategory('Farmland');
-  };
-
-  const filteredAndSortedItems = useMemo(() => {
-    let result = items.filter(i => {
-      const matchesCategory = activeCategory === 'All' || i.category === activeCategory;
+  // --- Smart Search & Filtering Logic ---
+  const filteredProperties = useMemo(() => {
+    return properties.filter(p => {
       const matchesSearch = 
-        i.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        i.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        i.street.toLowerCase().includes(searchQuery.toLowerCase());
+        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.street.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.nearby.some(n => n.toLowerCase().includes(searchQuery.toLowerCase()));
       
-      const matchesBudget = i.price <= filterBudget;
-      const matchesFacing = filterFacing === 'All' || i.facing === filterFacing;
-      const matchesVerified = !filterVerified || i.verified;
-      const matchesGated = !filterGated || i.category === 'Gated Community' || i.tags.includes('gated community plots');
-      const matchesReady = !filterReady || i.readyToConstruct;
+      const matchesCity = filters.city === 'All' || p.city === filters.city;
+      const matchesCategory = filters.category === 'All' || p.category === filters.category;
+      const matchesType = filters.type === 'All' || p.type === filters.type;
 
-      return matchesCategory && matchesSearch && matchesBudget && matchesFacing && matchesVerified && matchesGated && matchesReady;
-    })
+      return matchesSearch && matchesCity && matchesCategory && matchesType;
+    });
+  }, [properties, searchQuery, filters]);
 
-    if (sortOrder === 'high') result.sort((a, b) => b.price - a.price)
-    if (sortOrder === 'low') result.sort((a, b) => a.price - b.price)
-    if (sortOrder === 'roi') result.sort((a, b) => parseFloat(b.roi) - parseFloat(a.roi))
-    return result
-  }, [items, activeCategory, searchQuery, sortOrder, filterBudget, filterFacing, filterVerified, filterGated, filterReady])
+  // --- Functions ---
+  const toggleFavorite = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  };
 
-
-  // bookingStep/filters state is UI-only
-
-  const toggleCompare = (id: string) => {
-    setCompareList(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
-  }
-
-  const toggleFavorite = (id: string) => {
-    setFavorites(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
-  }
-
-  const handlePropertyClick = (property: Listing) => {
-    setSelectedProperty(property);
-    setBookingStep('schedule');
-
-  }
-
-  const similarPlots = useMemo(() => {
-    if (!selectedProperty) return [];
-    return items.filter(i => i._id !== selectedProperty._id && (i.category === selectedProperty.category || i.location === selectedProperty.location));
-  }, [selectedProperty, items]);
-
-  return (
-    <div className="min-h-screen bg-[#FAFAFA] text-zinc-800 font-light antialiased selection:bg-indigo-50 selection:text-indigo-900">
-      
-      {/* Top Ambient Lights */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-200/20 rounded-full blur-[120px] pointer-events-none" />
-
-      {/* --- PLATFORM TOP BAR --- */}
-      <div className="bg-white/60 backdrop-blur-md border-b border-zinc-100 py-3 px-8 sticky top-0 z-[100]">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3 text-xs tracking-wider text-zinc-500">
-            <Crosshair size={13} className="text-indigo-500 animate-pulse" /> 
-            <span className="font-normal text-zinc-800">Discovery Corridor:</span> Miryalaguda Hub, TS
-          </div>
-          <div className="hidden md:flex gap-6 text-xs text-zinc-400 tracking-wide">
-            <span className="flex items-center gap-1.5"><Target size={13} className="text-emerald-500"/> Real-time Yield Track Active</span>
-            <span className="flex items-center gap-1.5"><ShieldCheck size={13} className="text-indigo-500"/> HNTDA / DTCP Registered Zones</span>
-          </div>
-        </div>
-      </div>
-
-      {/* --- MAIN HEADER SECTION --- */}
-      <section className="pt-16 pb-12 px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 mb-12">
-            <div className="space-y-3">
-              <span className="text-xs uppercase tracking-[0.25em] text-indigo-600 font-medium">Sovereign Investment Platform</span>
-              <h1 className="text-4xl md:text-5xl font-extralight tracking-tight text-zinc-900 leading-[1.15]">
-                Premium Lands & <br />
-                <span className="font-serif italic font-light text-zinc-800">High-Growth Strategic Plots.</span>
-              </h1>
-              <p className="text-zinc-400 text-sm max-w-md font-light leading-relaxed">
-                Empowering tier-1 private portfolios with predictive real estate land verification, structured ventures, and immediate digital hold orchestration.
-              </p>
-            </div>
-
-            {/* Smart Core Search Integration */}
-            <div className="w-full lg:w-auto space-y-3">
-              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-1.5 flex flex-col sm:flex-row gap-1 items-stretch sm:items-center min-w-[320px] lg:min-w-[560px]">
-                <div className="relative flex-1 flex items-center px-3">
-                  <Search className="text-zinc-400 shrink-0" size={16} />
-                  <input 
-                    type="text" 
-                    placeholder="Search street, strategic landmark, venture or AI criteria..." 
-                    className="w-full bg-transparent pl-3 pr-2 py-3 outline-none text-sm text-zinc-800 font-light"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <Sparkles size={14} className="text-indigo-400 animate-pulse ml-1" />
-                </div>
-                
-                <div className="hidden sm:block w-px h-6 bg-zinc-200 self-center" />
-
-                <div className="flex items-center gap-1.5 px-2">
-                  <button 
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`p-2.5 rounded-xl border transition-all flex items-center gap-2 text-xs font-medium ${showFilters ? 'bg-zinc-900 border-zinc-950 text-white' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'}`}
-                  >
-                    <Filter size={14} /> Filters
-                  </button>
-                  <button onClick={() => setIsAddOpen(true)} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-xs font-medium hover:bg-indigo-700 transition-all flex items-center gap-2">
-                    <Plus size={14} /> Post Land
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 items-center text-xs text-zinc-400 px-1">
-                <span className="flex items-center gap-1 text-[11px]"><Sparkles size={11} className="text-indigo-500" /> AI Prompts:</span>
-                {['High ROI Gated Plots near Highway 65', 'Premium East-facing farmland'].map((sug) => (
-                  <button key={sug} onClick={() => handleAiSearch(sug)} className="text-zinc-600 underline decoration-zinc-200 hover:decoration-indigo-500 transition-colors text-[11px]">
-
-                    "{sug}"
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Collapsible Advanced Filters Panel */}
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mb-10 p-6 bg-white border border-zinc-100 rounded-2xl shadow-sm space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-zinc-500">Max Cap Valuation: ₹{(filterBudget / 100000).toFixed(0)} Lakhs</label>
-                    <input type="range" min={1000000} max={50000000} step={500000} value={filterBudget} onChange={(e) => setFilterBudget(Number(e.target.value))} className="w-full accent-indigo-600 h-1 bg-zinc-100 rounded-lg appearance-none cursor-pointer" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-zinc-500">Tract Facing</label>
-                    <select value={filterFacing} onChange={(e) => setFilterFacing(e.target.value)} className="w-full bg-transparent border border-zinc-200 rounded-xl px-3 py-2 text-xs font-light outline-none">
-                      <option value="All">All Directions</option>
-                      <option value="East">East-Facing</option>
-                      <option value="North">North-Facing</option>
-                      <option value="Corner">Corner Variant</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-zinc-500">Strategic Parameters</label>
-                    <div className="flex border border-zinc-200 rounded-xl p-0.5 text-xs">
-                      <button onClick={() => setSortOrder('new')} className={`flex-1 py-1.5 text-center rounded-lg ${sortOrder === 'new' ? 'bg-zinc-100 font-normal' : ''}`}>Recent</button>
-                      <button onClick={() => setSortOrder('roi')} className={`flex-1 py-1.5 text-center rounded-lg ${sortOrder === 'roi' ? 'bg-zinc-100 font-normal' : ''}`}>Yield Tier</button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-4 items-center pt-5">
-                    <label className="flex items-center gap-2 text-xs text-zinc-600 cursor-pointer">
-                      <input type="checkbox" checked={filterVerified} onChange={(e) => setFilterVerified(e.target.checked)} className="accent-indigo-600 rounded" /> Verified Core Only
-                    </label>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Soft Filter Tabs Hierarchy */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar border-b border-zinc-100 pb-px">
-            {['All', 'Plot', 'Gated Community', 'Farmland', 'Villa', 'Commercial'].map(cat => (
-              <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-5 py-3 text-xs tracking-wider transition-all relative whitespace-nowrap ${activeCategory === cat ? 'text-indigo-600 font-normal' : 'text-zinc-400 hover:text-zinc-900'}`}>
-                {cat}s {activeCategory === cat && <motion.div layoutId="activeCatUnderline" className="absolute bottom-0 left-0 right-0 h-px bg-indigo-600" />}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* --- MAIN GRID OF PLOTS --- */}
-      <main className="max-w-7xl mx-auto px-8 py-4 mb-24">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <AnimatePresence mode="popLayout">
-            {filteredAndSortedItems.map((item, idx) => (
-              <AssetLuxuryCard 
-                key={item._id} 
-                item={item} 
-                index={idx}
-                isReserved={reservedPlots.includes(item._id)}
-                isComparing={compareList.includes(item._id)}
-                isFavorite={favorites.includes(item._id)}
-                onToggleFavorite={() => toggleFavorite(item._id)}
-                onToggleCompare={() => toggleCompare(item._id)}
-                onSelect={() => handlePropertyClick(item)}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
-      </main>
-
-      {/* --- PREMIUM COMPREHENSIVE PROPERTY PROFILE MODAL (FULL DRAWER) --- */}
-      <AnimatePresence>
-        {selectedProperty && (
-          <div className="fixed inset-0 z-[220] flex justify-end overflow-hidden">
-            {/* Soft Ambient Backdrop Blur */}
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }} 
-              onClick={() => setSelectedProperty(null)} 
-              className="absolute inset-0 bg-zinc-950/20 backdrop-blur-md" 
-            />
-
-            {/* Dynamic Sliding Luxury Core Canvas */}
-            <motion.div 
-              initial={{ x: '100%' }} 
-              animate={{ x: 0 }} 
-              exit={{ x: '100%' }} 
-              transition={{ type: 'spring', damping: 28, stiffness: 200 }}
-              className="relative w-full max-w-4xl bg-white shadow-2xl overflow-y-auto flex flex-col z-10 border-l border-zinc-100"
-            >
-              {/* Header Context Action Line */}
-              <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-zinc-100 px-8 py-4 flex justify-between items-center z-20">
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-indigo-600 font-medium bg-indigo-50/60 px-2 py-0.5 rounded">Tract System Record</span>
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs text-zinc-400 font-light">Available Near Your Core Selection Location</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => toggleCompare(selectedProperty._id)}
-                    className={`p-2 rounded-xl border text-xs transition-all ${compareList.includes(selectedProperty._id) ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500'}`}
-                  >
-                    <BarChart3 size={14} />
-                  </button>
-                  <button onClick={() => setSelectedProperty(null)} className="size-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-400 hover:text-zinc-800 transition-colors">
-                    <X size={16} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Comprehensive Luxury View Content */}
-              <div className="p-8 space-y-10 flex-1">
-                
-                {/* 1. High Definition Dynamic Gallery Component */}
-                <ImageCarouselSection images={selectedProperty.images} title={selectedProperty.title} />
-
-                {/* 2. Primary Title Block & Core Economics */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-zinc-100">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-xs text-zinc-400">
-                      <span>{selectedProperty.category} Assets</span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1"><MapPin size={11} /> {selectedProperty.location}, {selectedProperty.street}</span>
-                    </div>
-                    <h2 className="text-2xl font-extralight text-zinc-900 tracking-tight">{selectedProperty.title}</h2>
-                  </div>
-                  <div className="text-right md:text-right">
-                    <span className="text-xs uppercase tracking-widest text-zinc-400 block font-light">Structured Valuation</span>
-                    <span className="text-2xl font-light text-indigo-600 tracking-tight">
-                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(selectedProperty.price)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 3. Comprehensive Metric Architectural Spec Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-zinc-50/60 border border-zinc-100 p-4 rounded-xl space-y-1">
-                    <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Total Area (Acres)</span>
-                    <span className="text-base text-zinc-800 font-light">{selectedProperty.acres} Acres</span>
-                  </div>
-                  <div className="bg-zinc-50/60 border border-zinc-100 p-4 rounded-xl space-y-1">
-                    <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Square Yards / Feet</span>
-                    <span className="text-base text-zinc-800 font-light">{selectedProperty.sqyd} / {selectedProperty.sqft}</span>
-                  </div>
-                  <div className="bg-zinc-50/60 border border-zinc-100 p-4 rounded-xl space-y-1">
-                    <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Metric Bounds</span>
-                    <span className="text-base text-zinc-800 font-light">{selectedProperty.lengthMeters}m x {selectedProperty.widthMeters}m</span>
-                  </div>
-                  <div className="bg-zinc-50/60 border border-zinc-100 p-4 rounded-xl space-y-1">
-                    <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Road Infrastructure</span>
-                    <span className="text-base text-zinc-800 font-light">{selectedProperty.roadWidthFt} ft Width</span>
-                  </div>
-                </div>
-
-                {/* 4. Strategic Investment Analytics Dashboard Layer */}
-                <div className="bg-indigo-50/30 border border-indigo-100/50 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-light">
-                      <TrendingUp size={14} className="text-indigo-600" /> Platform Score Index
-                    </div>
-                    <p className="text-2xl font-extralight text-zinc-900">{selectedProperty.investmentScore} <span className="text-xs text-indigo-600 font-normal">Highly Secured</span></p>
-                    <p className="text-[11px] text-zinc-400">Exceeds municipal baseline checks for seamless liquidation.</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-light">
-                      <Landmark size={14} className="text-amber-600" /> Regulation Standing
-                    </div>
-                    <p className="text-sm text-zinc-800 font-normal pt-1 flex items-center gap-1">
-                      <ShieldCheck size={14} className="text-emerald-500" /> HNTDA Approved Venture
-                    </p>
-                    <p className="text-[11px] text-zinc-400">Clear titles completely cataloged with direct clear ancestry logs.</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-light">
-                      <Zap size={14} className="text-indigo-600" /> Immediate Infrastructure
-                    </div>
-                    <div className="flex gap-4 pt-1 text-xs text-zinc-700">
-                      <span className="flex items-center gap-1"><Droplet size={12} className="text-blue-500"/> Phase-1 Water</span>
-                      <span className="flex items-center gap-1"><Zap size={12} className="text-amber-500"/> Substation Grid</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400">Ready to break ground with residential/commercial layouts instantly.</p>
-                  </div>
-                </div>
-
-                {/* 5. Split Grid: Highlights & Strategic Analytics Engine */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-normal uppercase tracking-widest text-zinc-400">Premium Tract Signature Amenities</h4>
-                    <ul className="space-y-2.5">
-                      {selectedProperty.amenities.map((amenity, idx) => (
-                        <li key={`${amenity}-${idx}`} className="flex items-center gap-2 text-xs text-zinc-600 font-light">
-
-                          <div className="size-1.5 rounded-full bg-indigo-500" />
-                          {amenity}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="space-y-4 bg-zinc-50/50 p-5 border border-zinc-100 rounded-xl">
-                    <h4 className="text-xs font-normal uppercase tracking-widest text-zinc-400">Future Growth & Area Value Modeling</h4>
-                    <div className="space-y-3 text-xs font-light text-zinc-600">
-                      <div className="flex justify-between items-center">
-                        <span>Expected 3-Year Compounding</span>
-                        <span className="text-emerald-600 font-medium">+45.2% Predictive Spike</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Demand Velocity Metric</span>
-                        <span className="text-zinc-800 font-normal">9.4 / 10 Volumetric Index</span>
-                      </div>
-                      <p className="text-[11px] text-zinc-400 leading-relaxed border-t border-zinc-200/60 pt-2">
-                        Micro-market analytics map strong multi-sector growth patterns driven by upcoming transport junctions and commercial tech sprawl zones.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 6. Surrounding Institutional Matrix (Schools, Hospitals, IT Parks) */}
-                <div className="space-y-4">
-                  <h4 className="text-xs font-normal uppercase tracking-widest text-zinc-400">Strategic External Infrastructure Connectivity</h4>
-                  <div className="border border-zinc-100 rounded-xl divide-y divide-zinc-100 text-xs font-light text-zinc-700">
-                    <div className="p-3.5 flex justify-between items-start gap-4">
-                      <span className="text-zinc-400 min-w-[100px]">Education Nodes</span>
-                      <span className="text-right text-zinc-800">{selectedProperty.infrastructure.schools}</span>
-                    </div>
-                    <div className="p-3.5 flex justify-between items-start gap-4">
-                      <span className="text-zinc-400 min-w-[100px]">Medical Core</span>
-                      <span className="text-right text-zinc-800">{selectedProperty.infrastructure.hospitals}</span>
-                    </div>
-                    <div className="p-3.5 flex justify-between items-start gap-4">
-                      <span className="text-zinc-400 min-w-[100px]">IT & High-Value Parks</span>
-                      <span className="text-right text-zinc-800">{selectedProperty.infrastructure.itParks}</span>
-                    </div>
-                    <div className="p-3.5 flex justify-between items-start gap-4">
-                      <span className="text-zinc-400 min-w-[100px]">Transit Hubs</span>
-                      <span className="text-right text-zinc-800">{selectedProperty.infrastructure.transit}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 7. Virtual Mapping Preview Layer Placeholder */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-normal uppercase tracking-widest text-zinc-400">Integrated GPS Cadastral Map View</h4>
-                  <div className="h-44 w-full bg-zinc-100 rounded-2xl relative overflow-hidden flex items-center justify-center border border-zinc-200">
-                    <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-40" />
-                    <div className="z-10 text-center space-y-1 px-4">
-                      <span className="text-xs font-light text-zinc-500 flex items-center justify-center gap-1"><Compass className="animate-spin text-indigo-500" size={13} /> Live Geospatial Blueprint Latency Lock</span>
-                      <p className="text-[11px] text-zinc-400">Direct integration mapping showing exact coordinates: {selectedProperty.location} Section.</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 8. AI Tailored Variants Carousel */}
-                {similarPlots.length > 0 && (
-                  <div className="space-y-4 pt-4">
-                    <h4 className="text-xs font-normal uppercase tracking-widest text-zinc-400">AI Predictive Recommendations: Similar High-Yield Alternatives</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {similarPlots.map(plot => (
-                        <div 
-                          key={plot._id} 
-                          onClick={() => handlePropertyClick(plot)}
-                          className="p-4 bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-100 rounded-xl transition-all cursor-pointer flex gap-3 items-center"
-                        >
-                          <img src={plot.images[0]} className="size-14 rounded-lg object-cover" alt="" />
-                          <div className="flex-1 min-w-0">
-                            <h5 className="text-xs font-normal text-zinc-800 truncate">{plot.title}</h5>
-                            <p className="text-[11px] text-zinc-400">{plot.location} • {plot.roi}</p>
-                          </div>
-                          <ChevronRight size={14} className="text-zinc-400" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              </div>
-
-              {/* Secure Direct Orchestration Footer Dock */}
-              <div className="sticky bottom-0 bg-white border-t border-zinc-100 p-6 px-8 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 z-20">
-                <div className="flex gap-3">
-                  <a href={`https://wa.me/919000000000?text=Inquiry regarding ${encodeURIComponent(selectedProperty.title)}`} target="_blank" rel="noreferrer" className="border border-zinc-200 hover:border-zinc-300 text-zinc-700 size-11 rounded-xl flex items-center justify-center transition-colors">
-                    <MessageSquare size={16} />
-                  </a>
-                  <a href="tel:+919000000000" className="border border-zinc-200 hover:border-zinc-300 text-zinc-700 size-11 rounded-xl flex items-center justify-center transition-colors">
-                    <Phone size={16} />
-                  </a>
-                </div>
-
-                <div className="flex gap-3 flex-1 sm:flex-none justify-end">
-                  <button 
-                    disabled={reservedPlots.includes(selectedProperty._id)}
-                    onClick={() => setBookingStep('payment')}
-                    className="px-5 py-3 border border-indigo-200 text-indigo-700 hover:bg-indigo-50/50 rounded-xl text-xs font-medium tracking-wide transition-colors disabled:opacity-40"
-                  >
-                    {reservedPlots.includes(selectedProperty._id) ? 'Tract Held' : 'Reserve Plot Spot'}
-                  </button>
-                  <button 
-                    disabled={reservedPlots.includes(selectedProperty._id)}
-                    onClick={() => setBookingStep('schedule')}
-                    className="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-medium tracking-wide transition-colors disabled:opacity-40 flex items-center gap-2"
-                  >
-                    Schedule Concierge Visit <ArrowRight size={13} />
-                  </button>
-                </div>
-              </div>
-
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- ADD PORTFOLIO TRACT DRAWER --- */}
-      <AnimatePresence>
-        {isAddOpen && (
-          <div className="fixed inset-0 z-[200] flex justify-end">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.3 }} exit={{ opacity: 0 }} onClick={() => setIsAddOpen(false)} className="absolute inset-0 bg-black" />
-            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 180 }} className="relative w-full max-w-xl bg-white/95 backdrop-blur-xl p-10 overflow-y-auto shadow-2xl border-l border-zinc-100 flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-center mb-10">
-                  <span className="text-xs uppercase tracking-widest text-zinc-400 font-medium flex items-center gap-2"><Sparkles size={12} className="text-indigo-500" /> Digital Asset Vault</span>
-                  <button onClick={() => setIsAddOpen(false)} className="size-8 rounded-full border border-zinc-100 flex items-center justify-center text-zinc-400 hover:text-zinc-800"><X size={14}/></button>
-                </div>
-                <div className="space-y-6">
-                  <div className="space-y-1">
-                    <h2 className="text-2xl font-extralight text-zinc-900 tracking-tight">Onboard Strategic Real-Estate</h2>
-                    <p className="text-xs text-zinc-400">Your plot undergoes architectural verification prior to indexing.</p>
-                  </div>
-                  <div className="space-y-4 pt-4">
-                    <Input label="Venture / Sovereign Estate Title" placeholder="e.g. Sovereign Golden Crest Plot 40" />
-                    <div className="grid grid-cols-2 gap-4">
-                      <Input label="Premium Valuation (₹)" placeholder="e.g. 75,00,000" />
-                      <Input label="Tract Dimensions (W x L)" placeholder="e.g. 40 x 60 ft" />
-                    </div>
-                    <div className="p-8 border border-dashed border-zinc-200 rounded-xl bg-zinc-50/50 flex flex-col items-center gap-2 hover:border-indigo-400 transition-all cursor-pointer group">
-                      <Camera className="text-zinc-300 group-hover:text-indigo-400 transition-colors" size={24} />
-                      <span className="text-xs font-light text-zinc-400">Upload Ultra-HD Site Blueprints</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="pt-8 mt-8 border-t border-zinc-100">
-                <button onClick={() => setIsAddOpen(false)} className="w-full py-4 bg-zinc-900 text-white rounded-xl text-xs font-medium hover:bg-zinc-800 transition-colors tracking-wider">
-                  Deploy Asset for Verification
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- PRIVATE ADVANCE BOOKING MODAL INNER ARCHITECTURE --- */}
-      <AnimatePresence>
-        {bookingStep && selectedProperty && (bookingStep === 'payment' || bookingStep === 'confirmed') && (
-          <div className="fixed inset-0 z-[230] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.4 }} exit={{ opacity: 0 }} onClick={() => setBookingStep('schedule')} className="absolute inset-0 bg-black" />
-            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="relative bg-white max-w-md w-full rounded-3xl p-8 shadow-2xl border border-zinc-100 overflow-hidden z-10">
-              
-              {bookingStep === 'payment' && (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[10px] uppercase tracking-widest text-amber-600 font-medium">Priority Token Assignment</span>
-                      <h3 className="text-xl font-extralight text-zinc-900 tracking-tight mt-1">Reserve Secure Escrow Allocation</h3>
-                    </div>
-                    <button onClick={() => setBookingStep('schedule')} className="p-1 text-zinc-400 hover:text-zinc-900"><X size={16}/></button>
-                  </div>
-                  
-                  <div className="bg-zinc-50 p-4 rounded-xl space-y-2 border border-zinc-100">
-                    <div className="flex justify-between text-xs font-light text-zinc-500">
-                      <span>Priority Allotment Hold Fee</span>
-                      <span className="text-zinc-800 font-normal">₹25,000</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-light text-zinc-400">
-                      <span>Escrow Security Cover</span>
-                      <span>100% Fully Refundable</span>
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={() => {
-                      setReservedPlots(prev => [...prev, selectedProperty._id]);
-                      setBookingStep('confirmed');
-                    }}
-                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-medium tracking-wider transition-colors shadow-lg shadow-indigo-100"
-                  >
-                    Authorize Escrow Allocation & Hold Tract
-                  </button>
-                </div>
-              )}
-
-              {bookingStep === 'confirmed' && (
-                <div className="text-center py-6 space-y-4">
-                  <div className="size-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-                    <Check size={20} />
-                  </div>
-                  <div className="space-y-1">
-                    <h3 className="text-lg font-light text-zinc-900">Allocation Token Primed</h3>
-                    <p className="text-xs text-zinc-400 max-w-xs mx-auto font-light">Your private land slot hold sequence has been initialized securely.</p>
-                  </div>
-                  <button onClick={() => { setBookingStep('schedule'); setSelectedProperty(null); }} className="mt-4 px-6 py-2 border border-zinc-200 text-zinc-700 text-xs rounded-xl hover:bg-zinc-50 transition-colors">
-                    Close Secure Window
-                  </button>
-                </div>
-              )}
-
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-// --- SUB CONTENT LOGIC COMPONENTS ---
-
-function ImageCarouselSection({ images, title }: { images: string[], title: string }) {
-  const [activeIdx, setActiveIdx] = useState(0);
-
-  return (
-    <div className="space-y-3">
-      <div className="relative aspect-[2.1/1] w-full rounded-2xl overflow-hidden bg-zinc-100 border border-zinc-200">
-        <img src={images[activeIdx]} className="w-full h-full object-cover transition-all duration-500" alt={title} />
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/40 to-transparent p-4 flex justify-between items-end">
-          <span className="text-[10px] text-white/90 font-light tracking-wider uppercase bg-black/20 backdrop-blur-sm px-2 py-0.5 rounded">Asset Perspective {activeIdx + 1} of {images.length}</span>
-        </div>
-      </div>
-      <div className="flex gap-2.5 overflow-x-auto pb-1">
-        {images.map((img, i) => (
-          <button 
-            key={`${img || 'img'}-${i}`} 
-            onClick={() => setActiveIdx(i)}
-            className={`relative size-16 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${activeIdx === i ? 'border-indigo-600' : 'border-transparent opacity-60'}`}
-          >
-            <img src={img} className="w-full h-full object-cover" alt="" />
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function AssetLuxuryCard({ 
-  item, 
-  index, 
-  isReserved, 
-  isComparing, 
-  isFavorite,
-  onToggleFavorite,
-  onToggleCompare, 
-  onSelect 
-}: { 
-  item: Listing
-  index: number
-  isReserved: boolean
-  isComparing: boolean
-  isFavorite: boolean
-  onToggleFavorite: () => void
-  onToggleCompare: () => void
-  onSelect: () => void
-}) {
-  const formatINR = (val: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency', currency: 'INR', maximumFractionDigits: 0
-    }).format(val);
+  const handleBookingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProperty) return;
+    
+    setIsBooking(true);
+    try {
+      const res = await fetch('http://localhost:4000/api/marketplace-bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          marketplaceItemId: selectedProperty.id,
+          userName: bookingData.name || 'Guest',
+          userPhone: bookingData.phone || '0000000000',
+          visitDate: bookingData.date || new Date().toISOString(),
+          message: bookingData.message,
+          userId: getUserId()
+        })
+      });
+      if (res.ok) {
+        setPaymentSuccess(true);
+        setShowBookingForm(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      transition={{ delay: Math.min(index * 0.04, 0.3), duration: 0.5 }}
-      className="group relative cursor-pointer"
-      onClick={onSelect}
-    >
-      <div className="relative bg-white rounded-3xl border border-zinc-200/60 overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.01)] transition-all duration-500 hover:shadow-[0_12px_40px_rgba(0,0,0,0.03)] hover:border-zinc-300 flex flex-col h-full">
+    <div className="relative h-screen w-screen overflow-hidden bg-zinc-950 font-sans text-white">
+      
+      {/* --- PREMIUM BACKGROUND --- */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900" />
+        <div className="absolute -left-32 -top-32 size-[40rem] rounded-full bg-cyan-500/20 blur-[100px]" />
+        <div className="absolute -right-32 bottom-0 size-[40rem] rounded-full bg-purple-500/20 blur-[100px]" />
+        <div className="absolute left-1/3 top-1/2 size-[30rem] -translate-y-1/2 rounded-full bg-indigo-500/10 blur-[100px]" />
+      </div>
+
+      {/* --- MAIN GLASS CONTAINER --- */}
+      <div className="relative z-10 flex h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] m-4 overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] backdrop-blur-2xl">
         
-        <div className="relative aspect-[1.35/1] overflow-hidden bg-zinc-50">
-          <img src={item.images[0]} className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700 ease-out" alt={item.title} />
-          
-          <div className="absolute inset-x-4 top-4 flex justify-between items-center pointer-events-none">
-            <div className="bg-white/70 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/40 flex items-center gap-1.5 shadow-sm pointer-events-auto">
-              <Navigation size={10} className="text-indigo-600 fill-indigo-600" />
-              <span className="text-[10px] text-zinc-800 font-normal">{item.distance}</span>
+        {/* --- LEFT SIDEBAR --- */}
+        <aside className="flex w-[260px] flex-col border-r border-white/10 bg-black/20 p-6">
+          <div className="mb-10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg">
+                <Landmark size={18} />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-white">LocalTown</span>
             </div>
-            
-            <button 
-              onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
-              className={`size-8 rounded-full flex items-center justify-center transition-all border pointer-events-auto ${isFavorite ? 'bg-white border-red-100 text-red-500 shadow-sm' : 'bg-white/70 backdrop-blur-md border-white/40 text-zinc-700 hover:bg-white'}`}
-            >
-              <Heart size={13} className={isFavorite ? 'fill-red-500' : ''} />
+            <button onClick={() => navigate(-1)} className="grid size-8 place-items-center rounded-full bg-white/5 hover:bg-white/10 transition">
+              <ChevronLeft size={18} className="text-zinc-300" />
             </button>
           </div>
 
-          {isReserved && (
-            <div className="absolute inset-0 bg-zinc-950/40 backdrop-blur-[2px] flex items-center justify-center">
-              <span className="bg-white/90 backdrop-blur px-4 py-1.5 rounded-xl border border-white text-xs tracking-widest text-zinc-900 font-medium uppercase">Acquisition Locked</span>
-            </div>
-          )}
-
-          <div className="absolute bottom-3 left-4 bg-zinc-900/80 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-zinc-800 text-[10px] font-light text-zinc-300 flex items-center gap-2">
-            <span className="text-emerald-400 font-normal">{item.roi}</span>
-            <div className="w-px h-2.5 bg-zinc-700" />
-            <span>{item.appreciation}% Yield</span>
-          </div>
-        </div>
-
-        <div className="p-6 flex-1 flex flex-col justify-between space-y-5">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-zinc-400 font-light">
-              <span className="flex items-center gap-1"><MapPin size={11} className="text-indigo-500" /> {item.location}, {item.street}</span>
-              {item.verified && <span className="text-indigo-600 bg-indigo-50/50 px-1.5 py-0.5 rounded-md text-[10px]">HNTDA Regulated</span>}
-            </div>
-            <h3 className="text-lg font-light text-zinc-900 tracking-tight leading-tight line-clamp-1 group-hover:text-indigo-600 transition-colors">
-              {item.title}
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 py-3 border-y border-zinc-100 text-xs font-light text-zinc-500">
+          {/* Filters Sidebar */}
+          <div className="flex flex-1 flex-col gap-8 overflow-y-auto custom-scrollbar pr-2 mt-4">
+            
             <div>
-              <span className="block text-[10px] text-zinc-300 uppercase tracking-wider mb-0.5">Area Matrix</span>
-              <span className="text-zinc-800 font-normal">{item.sqyd} <span className="text-zinc-400 text-[11px] font-light">sq.yd</span></span>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Asset Type</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Plot', 'Gated Community', 'Farmland', 'Villa', 'Commercial'].map(c => (
+                  <label key={c} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, category: c})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.category === c ? 'border-cyan-500 bg-cyan-500/20 text-cyan-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.category === c && <div className="size-2.5 rounded-sm bg-cyan-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.category === c ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{c}</span>
+                  </label>
+                ))}
+              </div>
             </div>
+
             <div>
-              <span className="block text-[10px] text-zinc-300 uppercase tracking-wider mb-0.5">Dimensions</span>
-              <span className="text-zinc-700 text-[11px]">{item.dimensions}</span>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Ownership</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Freehold', 'Leasehold'].map(t => (
+                  <label key={t} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, type: t})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.type === t ? 'border-indigo-500 bg-indigo-500/20 text-indigo-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.type === t && <div className="size-2.5 rounded-sm bg-indigo-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.type === t ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{t === 'All' ? 'Any' : t}</span>
+                  </label>
+                ))}
+              </div>
             </div>
-            <div>
-              <span className="block text-[10px] text-zinc-300 uppercase tracking-wider mb-0.5">Orientation</span>
-              <span className="text-zinc-800 font-normal">{item.facing}</span>
-            </div>
+
           </div>
 
-          <div className="flex items-center justify-between pt-2">
-            <div className="space-y-0.5">
-              <span className="block text-[10px] text-zinc-400 uppercase tracking-wider">Acquisition Rate</span>
-              <span className="text-lg font-light text-zinc-900 tracking-tight">{formatINR(item.price)}</span>
+          <button 
+            onClick={() => setShowAddForm(true)}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:scale-105"
+          >
+            <Plus size={18}/> Post Asset
+          </button>
+        </aside>
+
+        {/* --- RIGHT CONTENT AREA --- */}
+        <main className="flex flex-1 flex-col overflow-y-auto custom-scrollbar relative">
+          
+          <header className="sticky top-0 z-50 border-b border-white/10 bg-white/5 backdrop-blur-xl px-8 py-6 flex flex-col md:flex-row gap-6 md:items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-black text-white">Find premium real estate</h1>
+              <p className="mt-1 text-sm font-medium text-zinc-400">Discover verified investment properties.</p>
             </div>
-            <div className="flex gap-1.5">
-              <button 
-                onClick={(e) => { e.stopPropagation(); onToggleCompare(); }}
-                className={`p-2.5 rounded-xl border transition-all ${isComparing ? 'bg-zinc-100 border-zinc-300 text-zinc-900' : 'border-zinc-200 text-zinc-400'}`}
-              >
-                <BarChart3 size={13} />
-              </button>
-              <span className="bg-zinc-900 text-white px-4 py-2.5 rounded-xl text-xs font-medium tracking-wide inline-flex items-center">Explore Tract</span>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10 w-[300px]">
+                <Search size={18} className="text-zinc-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search location, asset..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent text-sm font-medium text-white placeholder-zinc-500 outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10">
+                <MapPin size={18} className="text-zinc-400" />
+                <select 
+                  onChange={(e) => setFilters({...filters, city: e.target.value})}
+                  className="w-[120px] bg-transparent text-sm font-medium text-white outline-none appearance-none"
+                >
+                  <option className="bg-zinc-900" value="All">All Cities</option>
+                  <option className="bg-zinc-900" value="Hyderabad">Hyderabad</option>
+                  <option className="bg-zinc-900" value="Bangalore">Bangalore</option>
+                  <option className="bg-zinc-900" value="Pune">Pune</option>
+                </select>
+              </div>
+            </div>
+          </header>
+
+          <div className="p-8">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex gap-4">
+                {['High ROI', 'Trending', 'New Additions'].map((tab, i) => (
+                  <span key={tab} className={`text-sm font-bold cursor-pointer transition-colors ${i === 0 ? 'text-cyan-400 border-b-2 border-cyan-400 pb-1' : 'text-zinc-500 hover:text-zinc-300'}`}>{tab}</span>
+                ))}
+              </div>
+              <p className="text-sm font-medium text-zinc-500">{filteredProperties.length} Assets Found</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredProperties.map((p, idx) => (
+                <motion.div 
+                  key={p.id} 
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.05 }}
+                  whileHover={{ y: -8 }}
+                  onClick={() => { setSelectedProperty(p); setPaymentSuccess(false); setActiveImgIdx(0); }}
+                  className={`group relative flex flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-md cursor-pointer transition-all hover:bg-white/10 hover:shadow-cyan-500/10 ${p.isBooked ? 'opacity-60' : ''}`}
+                >
+                  <div className="relative h-64 overflow-hidden">
+                    <img src={p.img[0]} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    
+                    <div className="absolute left-4 top-4 flex flex-col gap-2">
+                      {p.isBooked && <span className="rounded-full bg-red-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm">Sold Out</span>}
+                      {p.isVerified && <span className="flex items-center gap-1 rounded-full bg-cyan-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm"><ShieldCheck size={12}/> Verified</span>}
+                    </div>
+
+                    <div className="absolute right-4 top-4">
+                      <button 
+                        onClick={(e) => toggleFavorite(e, p.id)}
+                        className={`grid size-10 place-items-center rounded-full backdrop-blur-md transition-all border border-white/20 ${favorites.includes(p.id) ? 'bg-red-500/90 text-white' : 'bg-black/40 text-white hover:bg-black/60'}`}
+                      >
+                        <Heart size={18} fill={favorites.includes(p.id) ? "currentColor" : "none"} />
+                      </button>
+                    </div>
+
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h3 className="text-xl font-bold leading-tight text-white">{p.title}</h3>
+                      <p className="mt-1 flex items-center gap-1 text-sm font-medium text-zinc-300">
+                        <MapPin size={14} className="text-cyan-400" /> {p.street}, {p.city}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-6">
+                    <div className="mb-6 flex items-center justify-between">
+                      <div className="flex flex-wrap gap-2">
+                        {p.amenities.slice(0,3).map(a => (
+                          <span key={a} className="rounded-lg bg-white/10 px-2 py-1 text-[10px] font-bold text-zinc-300 border border-white/5">{a}</span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-xs font-bold text-yellow-400 border border-white/5">
+                        <Star size={12} fill="currentColor" /> {p.rating}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto flex items-end justify-between border-t border-white/10 pt-4">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Total Price</p>
+                        <div className="text-2xl font-black text-white">₹{p.price.toLocaleString()}</div>
+                      </div>
+                      <button className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg transition-transform group-hover:scale-110">
+                        <ArrowUpRight size={22} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
             </div>
           </div>
-
-        </div>
+        </main>
       </div>
-    </motion.div>
-  )
-}
 
-function Input({ label, placeholder }: { label: string, placeholder: string }) {
-  return (
-    <div className="space-y-1.5">
-      <label className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">{label}</label>
-      <input 
-        type="text" 
-        className="w-full bg-zinc-50 border border-zinc-100 px-4 py-3.5 rounded-xl outline-none text-xs font-light text-zinc-800 focus:bg-white transition-all"
-        placeholder={placeholder}
-      />
+      {/* --- ADD ASSET MODAL --- */}
+      <AnimatePresence>
+        {showAddForm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[3rem] p-10 w-full max-w-lg relative shadow-2xl">
+              <button onClick={() => setShowAddForm(false)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors"><X size={24}/></button>
+              <h2 className="text-3xl font-black mb-2">Post Asset</h2>
+              <p className="text-zinc-400 text-sm mb-8 font-medium">Join 500+ premium developers today.</p>
+              
+              <div className="space-y-4">
+                <div className="h-32 border-2 border-dashed border-white/20 bg-white/5 rounded-3xl flex flex-col items-center justify-center text-zinc-400 hover:border-cyan-400 hover:text-cyan-400 transition-colors cursor-pointer group">
+                  <Camera size={28} className="mb-2" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Drop Images Here</span>
+                </div>
+                <input type="text" placeholder="Asset Title" className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
+                <div className="flex gap-4">
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Hyderabad</option>
+                    <option>Bangalore</option>
+                  </select>
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Plot</option>
+                    <option>Farmland</option>
+                  </select>
+                </div>
+                <div className="flex gap-4">
+                  <input type="number" placeholder="Total Price (₹)" className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
+                </div>
+                <button className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-2xl font-bold uppercase tracking-widest mt-4 hover:shadow-lg hover:shadow-cyan-500/20 transition-all">Submit Asset</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- DETAILED BOOKING MODAL --- */}
+      <AnimatePresence>
+        {selectedProperty && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xl">
+            <motion.div 
+              layoutId={selectedProperty.id} 
+              className="bg-zinc-900 border border-white/10 rounded-[2.5rem] w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl relative"
+            >
+              <button onClick={() => setSelectedProperty(null)} className="absolute top-4 right-4 z-50 grid size-10 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md md:hidden"><X size={18}/></button>
+
+              <div className="md:w-1/2 relative bg-black">
+                <img src={selectedProperty.img[activeImgIdx]} className="w-full h-full object-cover opacity-90" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-zinc-900/50 hidden md:block" />
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
+                  {selectedProperty.img.map((img, i) => (
+                    <button key={i} onClick={() => setActiveImgIdx(i)} className={`h-1.5 rounded-full transition-all ${activeImgIdx === i ? 'w-8 bg-cyan-400' : 'w-2 bg-white/40'}`} />
+                  ))}
+                </div>
+              </div>
+
+              <div className="md:w-1/2 flex flex-col p-8 overflow-y-auto custom-scrollbar bg-zinc-900/90 relative">
+                <button onClick={() => setSelectedProperty(null)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors hidden md:block"><X size={24}/></button>
+                
+                <div className="flex gap-3 mb-4">
+                  <span className="rounded-full bg-cyan-500/20 text-cyan-400 px-3 py-1 text-[10px] font-black uppercase tracking-widest border border-cyan-500/30">Available Asset</span>
+                </div>
+                
+                <h2 className="text-3xl font-black tracking-tight mb-2">{selectedProperty.title}</h2>
+                <div className="flex items-center gap-2 text-sm text-zinc-400 font-medium mb-6">
+                  <MapPin size={16} className="text-cyan-400" /> {selectedProperty.street}, {selectedProperty.city}
+                </div>
+
+                <p className="text-zinc-400 text-sm leading-relaxed mb-8">{selectedProperty.desc}</p>
+
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  {[
+                    { icon: <Map />, label: 'Category', val: selectedProperty.category },
+                    { icon: <Building2 />, label: 'ROI', val: selectedProperty.roi },
+                    { icon: <Trees />, label: 'Type', val: selectedProperty.type },
+                  ].map((feat) => (
+                    <div key={feat.label} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center gap-4">
+                      <div className="text-cyan-400">{feat.icon}</div>
+                      <div>
+                        <p className="text-[10px] font-black text-zinc-500 uppercase">{feat.label}</p>
+                        <p className="text-sm font-bold">{feat.val}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-auto bg-black/40 border border-white/5 p-6 rounded-[2rem]">
+                  {!paymentSuccess ? (
+                    <div className="flex flex-col gap-4">
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Token Advance</p>
+                          <p className="text-3xl font-black text-white">₹{(selectedProperty.price * 0.05).toLocaleString()}</p>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Total Quote</p>
+                           <p className="text-lg font-bold text-zinc-300">₹{selectedProperty.price.toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setShowBookingForm(true)}
+                        disabled={selectedProperty.isBooked}
+                        className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 py-4 rounded-2xl font-bold uppercase tracking-widest text-sm hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50 text-white"
+                      >
+                        {isPaying ? <Loader2 className="animate-spin" /> : 'Reserve Plot Space'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <CheckCircle size={48} className="text-cyan-400 mx-auto mb-4" />
+                      <h3 className="text-2xl font-black mb-1">Asset Reserved!</h3>
+                      <p className="text-zinc-400 text-xs mb-6">Escrow ID: #ESC_{Math.floor(Math.random()*100000)}</p>
+                      <button onClick={() => setSelectedProperty(null)} className="w-full bg-white/10 py-3 rounded-xl font-bold uppercase text-xs hover:bg-white/20 transition-colors">Close</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- BOOKING FORM MODAL --- */}
+      <AnimatePresence>
+        {showBookingForm && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[2.5rem] p-8 w-full max-w-md relative shadow-2xl">
+              <button onClick={() => setShowBookingForm(false)} className="absolute top-6 right-6 text-zinc-400 hover:text-white transition-colors"><X size={20}/></button>
+              <h2 className="text-2xl font-black text-white mb-1">Reserve Asset</h2>
+              <p className="text-zinc-400 text-sm mb-6 font-medium">Leave your details to request booking.</p>
+              
+              <form onSubmit={handleBookingSubmit} className="space-y-4 text-white">
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Your Name</label>
+                  <input required value={bookingData.name} onChange={e=>setBookingData({...bookingData, name: e.target.value})} placeholder="John Doe" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Phone Number</label>
+                  <input required type="number" value={bookingData.phone} onChange={e=>setBookingData({...bookingData, phone: e.target.value})} placeholder="9999999999" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Preferred Date</label>
+                  <input required type="date" value={bookingData.date} onChange={e=>setBookingData({...bookingData, date: e.target.value})} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium [color-scheme:dark]" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Message (Optional)</label>
+                  <textarea value={bookingData.message} onChange={e=>setBookingData({...bookingData, message: e.target.value})} placeholder="Any specific requirements?" rows={2} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium"></textarea>
+                </div>
+                
+                <button disabled={isBooking} type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-xl font-bold uppercase tracking-widest mt-2 hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50">
+                  {isBooking ? <Loader2 className="animate-spin" /> : 'Confirm Reservation'}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
-  )
+  );
 }

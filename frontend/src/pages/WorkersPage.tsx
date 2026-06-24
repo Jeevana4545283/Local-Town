@@ -1,398 +1,498 @@
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Search,
-  Filter,
-  Star,
-  ShieldCheck,
-  Zap,
-  Droplets,
-  Paintbrush,
-  Hammer,
-  Wrench,
-  Truck,
-  Trash2,
-  Monitor,
-  HardHat,
-  TrendingUp,
-  Users,
-  CheckCircle2,
-  Phone,
-  MessageSquare,
-  Heart,
-  Calendar,
-  ChevronRight,
-  BarChart3,
-  Bot,
-  Info,
-  AlertCircle,
-  Navigation,
-  Clock,
-  Sparkles,
+import { useNavigate } from 'react-router-dom';
+import { 
+  Search, MapPin, Star, Heart, 
+  Briefcase, X, Loader2, CheckCircle,
+  ArrowUpRight, ShieldCheck, Camera,
+  Wrench, Clock, Zap, Plus, ChevronLeft
 } from 'lucide-react';
-import { useEffect, useState, useMemo } from 'react';
-import { api } from '../lib/api';
-import type { WorkerProfile } from '../types';
-import { WorkerCard } from '../components/cards/WorkerCard';
-import { Card } from '../components/ui/Card';
-import { demoWorkers } from '../demo/data';
 
+// --- Enhanced Types ---
+interface Worker {
+  id: string;
+  title: string;
+  price: number;
+  city: string;
+  street: string;
+  category: 'Electrician' | 'Plumber' | 'Carpenter' | 'Appliance' | 'Painter' | 'Cleaner';
+  type: 'Hourly' | 'Fixed';
+  nearby: string[];
+  rating: number;
+  reviewsCount: number;
+  img: string[];
+  desc: string;
+  isBooked: boolean;
+  isVerified: boolean;
+  amenities: string[];
+  phone?: string;
+}
 
-// --- Enhanced Service Categories ---
-const CATEGORIES = [
-  { id: 'electrician', label: 'Electrician', icon: <Zap className="size-4" />, color: 'bg-yellow-500' },
-  { id: 'plumber', label: 'Plumber', icon: <Droplets className="size-4" />, color: 'bg-blue-500' },
-  { id: 'painter', label: 'Painter', icon: <Paintbrush className="size-4" />, color: 'bg-rose-500' },
-  { id: 'carpenter', label: 'Carpenter', icon: <Hammer className="size-4" />, color: 'bg-orange-600' },
-  { id: 'mechanic', label: 'Mechanic', icon: <Wrench className="size-4" />, color: 'bg-slate-700' },
-  { id: 'delivery', label: 'Delivery', icon: <Truck className="size-4" />, color: 'bg-emerald-500' },
-  { id: 'cleaner', label: 'Cleaner', icon: <Trash2 className="size-4" />, color: 'bg-cyan-500' },
-  { id: 'appliance', label: 'Appliance', icon: <Monitor className="size-4" />, color: 'bg-indigo-500' },
-  { id: 'construction', label: 'Labour', icon: <HardHat className="size-4" />, color: 'bg-amber-700' },
-];
 
 export function WorkersPage() {
-  const [items, setItems] = useState<WorkerProfile[]>([]);
-  const [category, setCategory] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [properties, setProperties] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedWorker, setSelectedWorker] = useState<WorkerProfile | null>(null);
-  // activeTab removed (was unused); keep existing UI intact by leaving state unused
+  const [selectedProperty, setSelectedProperty] = useState<Worker | null>(null);
+  const [isPaying, setIsPaying] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
 
-  const [isEmergency, setIsEmergency] = useState(false);
+  // --- Booking Form State ---
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [bookingData, setBookingData] = useState({ name: '', phone: '', date: '', message: '' });
+  const [isBooking, setIsBooking] = useState(false);
 
-  // --- Real-time Analytics Mock ---
-  const marketplaceStats = useMemo(() => ({
-    onlineCount: 142,
-    avgArrival: '14 min',
-    savedJobs: 12,
-    satisfaction: 99.2
-  }), []);
+  const getUserId = () => {
+    let id = localStorage.getItem('lt_guest_id')
+    if (!id) {
+      id = 'guest-' + Math.random().toString(36).substr(2, 9)
+      localStorage.setItem('lt_guest_id', id)
+    }
+    return id
+  }
+
+  const navigate = useNavigate();
+
+  // --- Advanced Filter State ---
+  const [filters, setFilters] = useState({
+    city: 'All',
+    category: 'All',
+    type: 'All',
+    budget: 5000,
+  });
 
   useEffect(() => {
-    setLoading(true);
-    api
-      .get('/workers', { params: category ? { category } : undefined })
-      .then((r) => setItems(r.data.items || []))
-      .catch(() => {
-        // Advanced client-side filtering logic for fallback
-        let filtered = category ? demoWorkers.filter((w) => w.category === category) : demoWorkers;
-        if (searchQuery) {
-          filtered = filtered.filter(w => 
-            w.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-            w.category.toLowerCase().includes(searchQuery.toLowerCase())
-          );
+    fetch('http://localhost:4000/api/workers')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.items) {
+          const mapped: Worker[] = data.items.map((w: any) => ({
+            id: w.id,
+            title: w.name || 'Unknown Worker',
+            price: w.hourlyRate || 0,
+            city: w.address?.split(',')[0] || 'Unknown',
+            street: w.address || '',
+            category: w.profession || 'Other',
+            type: 'Hourly',
+            nearby: w.nearbyAreas || [],
+            rating: 4.8,
+            reviewsCount: Math.floor(Math.random() * 50) + 10,
+            img: w.imageUrls?.length ? w.imageUrls : ['https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&q=80'],
+            desc: w.description || 'Professional worker ready to help.',
+            isBooked: w.status !== 'Available',
+            isVerified: true,
+            amenities: [],
+            phone: w.phone || ''
+          }));
+          setProperties(mapped);
         }
-        if (isEmergency) {
-          filtered = filtered.filter(w => (w as any).isEmergency);
-        }
-        setItems(filtered as any);
       })
+      .catch((err) => console.error("Failed to load workers:", err))
       .finally(() => setLoading(false));
-  }, [category, searchQuery, isEmergency]);
+  }, []);
+
+  // --- Smart Search & Filtering Logic ---
+  const filteredProperties = useMemo(() => {
+    return properties.filter(p => {
+      const matchesSearch = 
+        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.street.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.nearby.some(n => n.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const matchesCity = filters.city === 'All' || p.city === filters.city;
+      const matchesCategory = filters.category === 'All' || p.category === filters.category;
+      const matchesType = filters.type === 'All' || p.type === filters.type;
+      const matchesBudget = p.price <= filters.budget;
+
+      return matchesSearch && matchesCity && matchesCategory && matchesType && matchesBudget;
+    });
+  }, [properties, searchQuery, filters]);
+
+  // --- Functions ---
+  const toggleFavorite = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  };
+
+  const handleBookingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProperty) return;
+    
+    setIsBooking(true);
+    try {
+      const res = await fetch('http://localhost:4000/api/workers-bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workerId: selectedProperty.id,
+          userName: bookingData.name || 'Guest',
+          userPhone: bookingData.phone || '0000000000',
+          visitDate: bookingData.date || new Date().toISOString(),
+          message: bookingData.message,
+          userId: getUserId()
+        })
+      });
+      if (res.ok) {
+        setPaymentSuccess(true);
+        setShowBookingForm(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsBooking(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#FDFDFF] text-slate-900 pb-20 font-sans selection:bg-indigo-100">
+    <div className="relative h-screen w-screen overflow-hidden bg-zinc-950 font-sans text-white">
       
-      {/* --- PREMIUM HEADER & AI SEARCH --- */}
-      <section className="relative pt-16 pb-24 px-6 overflow-hidden">
-        {/* Background Depth Elements */}
-        <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] bg-indigo-100/40 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-[-5%] w-[300px] h-[300px] bg-fuchsia-100/30 rounded-full blur-[100px]" />
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="max-w-3xl"
-            >
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-bold mb-6 shadow-xl shadow-slate-200">
-                <Bot className="size-4 text-indigo-400" />
-                <span>AI-Engine Powered Search</span>
-              </div>
-              <h1 className="text-6xl md:text-7xl font-black tracking-tighter leading-[0.9] mb-6">
-                Premium Help, <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600">
-                  Instantly Dispatched.
-                </span>
-              </h1>
-              <p className="text-xl text-slate-500 font-medium max-w-xl">
-                Book verified professionals for home maintenance, logistics, and technical repairs with real-time tracking.
-              </p>
-            </motion.div>
-
-            {/* Live Stats Glassmorphism Card */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-6 bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] shadow-2xl shadow-indigo-100/50">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Service Demand</p>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="size-5 text-emerald-500" />
-                  <span className="text-2xl font-black">High</span>
-                </div>
-              </div>
-              <div className="p-6 bg-white/60 backdrop-blur-xl border border-white rounded-[2rem] shadow-2xl shadow-indigo-100/50">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Active Pros</p>
-                <div className="flex items-center gap-2">
-                  <Users className="size-5 text-indigo-600" />
-                  <span className="text-2xl font-black">{marketplaceStats.onlineCount}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* AI Search Interface */}
-          <div className="flex flex-col md:flex-row items-center gap-4 bg-white p-3 rounded-[2.5rem] shadow-2xl shadow-indigo-100 border border-slate-100">
-            <div className="flex-1 flex items-center gap-4 px-6 py-2 border-r border-slate-50">
-              <Search className="size-6 text-indigo-500" />
-              <input 
-                type="text" 
-                placeholder="Try 'electrician for AC repair near me'..."
-                className="w-full bg-transparent border-none outline-none font-bold text-lg placeholder:text-slate-300"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-3 px-6 py-2">
-              <Navigation className="size-5 text-slate-400" />
-              <span className="font-bold text-slate-600 whitespace-nowrap">Current Location</span>
-            </div>
-            <button className="w-full md:w-auto px-10 py-5 bg-indigo-600 hover:bg-slate-900 text-white rounded-[1.8rem] font-black uppercase tracking-widest text-sm transition-all shadow-lg shadow-indigo-200 active:scale-95">
-              Find Expert
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* --- CATEGORY NAVIGATION --- */}
-      <div className="sticky top-0 z-[40] bg-white/80 backdrop-blur-md border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
-            <button 
-              onClick={() => setCategory('')}
-              className={`px-6 py-3 rounded-2xl text-sm font-black whitespace-nowrap transition-all ${!category ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
-            >
-              All Services
-            </button>
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setCategory(cat.id)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-black whitespace-nowrap transition-all ${category === cat.id ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
-              >
-                {cat.icon}
-                {cat.label}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* --- PREMIUM BACKGROUND --- */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900" />
+        <div className="absolute -left-32 -top-32 size-[40rem] rounded-full bg-cyan-500/20 blur-[100px]" />
+        <div className="absolute -right-32 bottom-0 size-[40rem] rounded-full bg-purple-500/20 blur-[100px]" />
+        <div className="absolute left-1/3 top-1/2 size-[30rem] -translate-y-1/2 rounded-full bg-indigo-500/10 blur-[100px]" />
       </div>
 
-      <main className="max-w-7xl mx-auto px-6 mt-16">
-        <div className="grid lg:grid-cols-12 gap-12">
-          
-          {/* --- MAIN LISTINGS --- */}
-          <div className="lg:col-span-8">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-3xl font-black tracking-tight">Verified Professionals</h2>
-                <p className="text-slate-400 font-medium">Found {items.length} experts matching your needs</p>
+      {/* --- MAIN GLASS CONTAINER --- */}
+      <div className="relative z-10 flex h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] m-4 overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] backdrop-blur-2xl">
+        
+        {/* --- LEFT SIDEBAR --- */}
+        <aside className="flex w-[260px] flex-col border-r border-white/10 bg-black/20 p-6">
+          <div className="mb-10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg">
+                <Briefcase size={18} />
               </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setIsEmergency(!isEmergency)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${isEmergency ? 'bg-rose-500 text-white' : 'bg-rose-50 text-rose-500'}`}
-                >
-                  <AlertCircle size={14} /> Emergency
-                </button>
-                <button className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50">
-                  <Filter size={18} />
-                </button>
-              </div>
+              <span className="text-xl font-bold tracking-tight text-white">LocalTown</span>
             </div>
-
-            <div className="grid sm:grid-cols-2 gap-6">
-              {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <div key={`worker-skel-${i}`} className="h-64 bg-white border border-slate-100 rounded-[2.5rem] p-8 animate-pulse">
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="size-16 bg-slate-100 rounded-2xl" />
-                      <div className="space-y-2">
-                        <div className="h-4 w-32 bg-slate-100 rounded" />
-                        <div className="h-3 w-20 bg-slate-100 rounded" />
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="h-10 bg-slate-100 rounded-2xl w-full" />
-                      <div className="h-10 bg-slate-100 rounded-2xl w-full" />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                items.map((w) => (
-                  <motion.div 
-                    key={w._id} 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    whileHover={{ y: -10 }}
-                    onClick={() => setSelectedWorker(w)}
-                    className="relative cursor-pointer group"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-fuchsia-500/10 rounded-[2.5rem] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <WorkerCard worker={w} />
-                  </motion.div>
-                ))
-              )}
-            </div>
+            <button onClick={() => navigate(-1)} className="grid size-8 place-items-center rounded-full bg-white/5 hover:bg-white/10 transition">
+              <ChevronLeft size={18} className="text-zinc-300" />
+            </button>
           </div>
 
-          {/* --- PREMIUM SIDEBAR WIDGETS --- */}
-          <div className="lg:col-span-4 space-y-8">
-            {/* AI Recommendation Widget */}
-            <Card className="p-8 border-none bg-slate-900 text-white rounded-[2.5rem] relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4">
-                <Bot className="size-10 text-indigo-500 opacity-20" />
-              </div>
-              <h3 className="text-xl font-black mb-4">Smart Tips</h3>
-              <div className="space-y-4">
-                <div className="flex gap-4">
-                  <div className="size-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-                    <Info className="size-5 text-indigo-400" />
-                  </div>
-                  <p className="text-sm text-slate-300 leading-relaxed">
-                    Most users in your area are currently booking <span className="text-white font-bold">Deep Cleaning</span> services for the weekend.
-                  </p>
-                </div>
-                <button className="w-full py-3 bg-white text-slate-900 rounded-2xl font-black text-xs hover:bg-indigo-50 transition-all mt-4">
-                  View Nearby Trends
-                </button>
-              </div>
-            </Card>
-
-            {/* Analytics Summary */}
-            <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-xl shadow-slate-100/50">
-              <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-6 flex items-center justify-between">
-                Marketplace Health
-                <BarChart3 className="size-4 text-emerald-500" />
-              </h3>
-              <div className="space-y-6">
-                {[
-                  { label: 'Avg Arrival', val: marketplaceStats.avgArrival, color: 'text-indigo-600' },
-                  { label: 'Saved Pros', val: marketplaceStats.savedJobs, color: 'text-rose-500' },
-                  { label: 'Rating', val: `${marketplaceStats.satisfaction}%`, color: 'text-emerald-500' },
-                ].map((stat) => (
-                  <div key={stat.label} className="flex items-center justify-between">
-
-                    <span className="text-sm font-bold text-slate-600">{stat.label}</span>
-                    <span className={`text-lg font-black ${stat.color}`}>{stat.val}</span>
-                  </div>
+          {/* Filters Sidebar */}
+          <div className="flex flex-1 flex-col gap-8 overflow-y-auto custom-scrollbar pr-2 mt-4">
+            
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Trade Category</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Electrician', 'Plumber', 'Carpenter', 'Appliance', 'Painter', 'Cleaner'].map(c => (
+                  <label key={c} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, category: c})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.category === c ? 'border-cyan-500 bg-cyan-500/20 text-cyan-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.category === c && <div className="size-2.5 rounded-sm bg-cyan-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.category === c ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{c}</span>
+                  </label>
                 ))}
               </div>
             </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Rate Type</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Hourly', 'Fixed'].map(t => (
+                  <label key={t} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, type: t})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.type === t ? 'border-indigo-500 bg-indigo-500/20 text-indigo-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.type === t && <div className="size-2.5 rounded-sm bg-indigo-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.type === t ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{t === 'All' ? 'Any' : t}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Max Rate: ₹{filters.budget.toLocaleString()}</p>
+              <input 
+                type="range" min="100" max="5000" step="100" 
+                value={filters.budget}
+                onChange={(e) => setFilters({...filters, budget: parseInt(e.target.value)})}
+                className="w-full accent-cyan-500"
+              />
+              <div className="flex justify-between mt-2 text-xs text-zinc-500 font-bold">
+                <span>₹100</span>
+                <span>₹5K+</span>
+              </div>
+            </div>
+
           </div>
-        </div>
-      </main>
 
-      {/* --- ADVANCED BOOKING MODAL --- */}
+          <button 
+            onClick={() => setShowAddForm(true)}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:scale-105"
+          >
+            <Plus size={18}/> List Service
+          </button>
+        </aside>
+
+        {/* --- RIGHT CONTENT AREA --- */}
+        <main className="flex flex-1 flex-col overflow-y-auto custom-scrollbar relative">
+          
+          <header className="sticky top-0 z-50 border-b border-white/10 bg-white/5 backdrop-blur-xl px-8 py-6 flex flex-col md:flex-row gap-6 md:items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-black text-white">Find verified pros</h1>
+              <p className="mt-1 text-sm font-medium text-zinc-400">Discover premium experts in your area.</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10 w-[300px]">
+                <Search size={18} className="text-zinc-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search skills, name..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent text-sm font-medium text-white placeholder-zinc-500 outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10">
+                <MapPin size={18} className="text-zinc-400" />
+                <select 
+                  onChange={(e) => setFilters({...filters, city: e.target.value})}
+                  className="w-[120px] bg-transparent text-sm font-medium text-white outline-none appearance-none"
+                >
+                  <option className="bg-zinc-900" value="All">All Cities</option>
+                  <option className="bg-zinc-900" value="Hyderabad">Hyderabad</option>
+                  <option className="bg-zinc-900" value="Bangalore">Bangalore</option>
+                  <option className="bg-zinc-900" value="Pune">Pune</option>
+                </select>
+              </div>
+            </div>
+          </header>
+
+          <div className="p-8">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex gap-4">
+                {['Top Rated', 'Available Now', 'Experts'].map((tab, i) => (
+                  <span key={tab} className={`text-sm font-bold cursor-pointer transition-colors ${i === 0 ? 'text-cyan-400 border-b-2 border-cyan-400 pb-1' : 'text-zinc-500 hover:text-zinc-300'}`}>{tab}</span>
+                ))}
+              </div>
+              <p className="text-sm font-medium text-zinc-500">{filteredProperties.length} Pros Found</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredProperties.map((p, idx) => (
+                <motion.div 
+                  key={p.id} 
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.05 }}
+                  whileHover={{ y: -8 }}
+                  onClick={() => { setSelectedProperty(p); setPaymentSuccess(false); setActiveImgIdx(0); }}
+                  className={`group relative flex flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-md cursor-pointer transition-all hover:bg-white/10 hover:shadow-cyan-500/10 ${p.isBooked ? 'opacity-60' : ''}`}
+                >
+                  <div className="relative h-64 overflow-hidden">
+                    <img src={p.img[0]} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    
+                    <div className="absolute left-4 top-4 flex flex-col gap-2">
+                      {p.isBooked && <span className="rounded-full bg-red-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm">Busy Now</span>}
+                      {p.isVerified && <span className="flex items-center gap-1 rounded-full bg-cyan-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm"><ShieldCheck size={12}/> Verified</span>}
+                    </div>
+
+                    <div className="absolute right-4 top-4">
+                      <button 
+                        onClick={(e) => toggleFavorite(e, p.id)}
+                        className={`grid size-10 place-items-center rounded-full backdrop-blur-md transition-all border border-white/20 ${favorites.includes(p.id) ? 'bg-red-500/90 text-white' : 'bg-black/40 text-white hover:bg-black/60'}`}
+                      >
+                        <Heart size={18} fill={favorites.includes(p.id) ? "currentColor" : "none"} />
+                      </button>
+                    </div>
+
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h3 className="text-xl font-bold leading-tight text-white">{p.title}</h3>
+                      <p className="mt-1 flex items-center gap-1 text-sm font-medium text-zinc-300">
+                        <MapPin size={14} className="text-cyan-400" /> {p.street}, {p.city}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-6">
+                    <div className="mb-6 flex items-center justify-between">
+                      <div className="flex flex-wrap gap-2">
+                        {p.amenities.slice(0,3).map(a => (
+                          <span key={a} className="rounded-lg bg-white/10 px-2 py-1 text-[10px] font-bold text-zinc-300 border border-white/5">{a}</span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-xs font-bold text-yellow-400 border border-white/5">
+                        <Star size={12} fill="currentColor" /> {p.rating}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto flex items-end justify-between border-t border-white/10 pt-4">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{p.type} Rate</p>
+                        <div className="text-2xl font-black text-white">₹{p.price.toLocaleString()}</div>
+                      </div>
+                      <button className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg transition-transform group-hover:scale-110">
+                        <ArrowUpRight size={22} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* --- ADD PROPERTY MODAL --- */}
       <AnimatePresence>
-        {selectedWorker && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        {showAddForm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[3rem] p-10 w-full max-w-lg relative shadow-2xl">
+              <button onClick={() => setShowAddForm(false)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors"><X size={24}/></button>
+              <h2 className="text-3xl font-black mb-2">List Your Service</h2>
+              <p className="text-zinc-400 text-sm mb-8 font-medium">Join 500+ premium pros today.</p>
+              
+              <div className="space-y-4">
+                <div className="h-32 border-2 border-dashed border-white/20 bg-white/5 rounded-3xl flex flex-col items-center justify-center text-zinc-400 hover:border-cyan-400 hover:text-cyan-400 transition-colors cursor-pointer group">
+                  <Camera size={28} className="mb-2" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Drop Photos Here</span>
+                </div>
+                <input type="text" placeholder="Your Name / Business" className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
+                <div className="flex gap-4">
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Hyderabad</option>
+                    <option>Bangalore</option>
+                  </select>
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Electrician</option>
+                    <option>Plumber</option>
+                  </select>
+                </div>
+                <div className="flex gap-4">
+                  <input type="number" placeholder="Rate (₹)" className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
+                </div>
+                <button className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-2xl font-bold uppercase tracking-widest mt-4 hover:shadow-lg hover:shadow-cyan-500/20 transition-all">Submit Profile</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- DETAILED BOOKING MODAL --- */}
+      <AnimatePresence>
+        {selectedProperty && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xl">
             <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/40 backdrop-blur-xl"
-              onClick={() => setSelectedWorker(null)}
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 40 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 40 }}
-              className="relative w-full max-w-5xl bg-white rounded-[3.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col md:flex-row"
+              layoutId={selectedProperty.id} 
+              className="bg-zinc-900 border border-white/10 rounded-[2.5rem] w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl relative"
             >
-              {/* Profile Side */}
-              <div className="md:w-[40%] bg-slate-50 p-12 border-r border-slate-100">
-                <div className="relative size-40 mx-auto mb-8">
-                  <div className="absolute inset-0 bg-indigo-600 rounded-[2.5rem] rotate-6 shadow-2xl" />
-                  <img 
-                    src={`https://ui-avatars.com/api/?name=${selectedWorker.name}&background=6366f1&color=fff&size=256`} 
-                    className="relative size-full object-cover rounded-[2.5rem] border-4 border-white"
-                    alt={selectedWorker.name}
-                  />
-                  <div className="absolute -bottom-2 -right-2 p-3 bg-emerald-500 text-white rounded-2xl shadow-lg border-4 border-white">
-                    <ShieldCheck className="size-6" />
-                  </div>
-                </div>
+              <button onClick={() => setSelectedProperty(null)} className="absolute top-4 right-4 z-50 grid size-10 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md md:hidden"><X size={18}/></button>
 
-                <div className="text-center mb-10">
-                  <h3 className="text-3xl font-black text-slate-900">{selectedWorker.name}</h3>
-                  <div className="flex items-center justify-center gap-1 text-emerald-600 font-black mt-2">
-                    <Star className="size-5 fill-current" />
-                    <span>{selectedWorker.rating || 4.9} (120+ reviews)</span>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                   <div className="p-4 bg-white rounded-2xl flex items-center justify-between border border-slate-100">
-                     <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Base Fare</span>
-                     <span className="text-lg font-black text-slate-900">₹399</span>
-                   </div>
-                   <div className="p-4 bg-white rounded-2xl flex items-center justify-between border border-slate-100">
-                     <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Distance</span>
-                     <span className="text-lg font-black text-slate-900">2.4 KM</span>
-                   </div>
-                </div>
-
-                <div className="mt-12 flex gap-3">
-                  <button className="flex-1 p-4 bg-white border-2 border-slate-100 rounded-2xl flex items-center justify-center hover:border-indigo-600 hover:text-indigo-600 transition-all">
-                    <MessageSquare size={20} />
-                  </button>
-                  <button className="flex-1 p-4 bg-white border-2 border-slate-100 rounded-2xl flex items-center justify-center hover:border-indigo-600 hover:text-indigo-600 transition-all">
-                    <Phone size={20} />
-                  </button>
+              <div className="md:w-1/2 relative bg-black">
+                <img src={selectedProperty.img[activeImgIdx]} className="w-full h-full object-cover opacity-90" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-zinc-900/50 hidden md:block" />
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
+                  {selectedProperty.img.map((img, i) => (
+                    <button key={i} onClick={() => setActiveImgIdx(i)} className={`h-1.5 rounded-full transition-all ${activeImgIdx === i ? 'w-8 bg-cyan-400' : 'w-2 bg-white/40'}`} />
+                  ))}
                 </div>
               </div>
 
-              {/* Booking Action Side */}
-              <div className="flex-1 p-12 overflow-y-auto max-h-[85vh]">
-                <div className="flex items-center justify-between mb-10">
-                  <h2 className="text-3xl font-black tracking-tight">Confirm Appointment</h2>
-                  <button onClick={() => setSelectedWorker(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-full">
-                    <ChevronRight className="size-6" />
-                  </button>
+              <div className="md:w-1/2 flex flex-col p-8 overflow-y-auto custom-scrollbar bg-zinc-900/90 relative">
+                <button onClick={() => setSelectedProperty(null)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors hidden md:block"><X size={24}/></button>
+                
+                <div className="flex gap-3 mb-4">
+                  <span className="rounded-full bg-cyan-500/20 text-cyan-400 px-3 py-1 text-[10px] font-black uppercase tracking-widest border border-cyan-500/30">Available Now</span>
+                </div>
+                
+                <h2 className="text-3xl font-black tracking-tight mb-2">{selectedProperty.title}</h2>
+                <div className="flex items-center gap-2 text-sm text-zinc-400 font-medium mb-6">
+                  <MapPin size={16} className="text-cyan-400" /> {selectedProperty.street}, {selectedProperty.city}
                 </div>
 
-                <div className="space-y-8">
-                  <div className="space-y-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Select Arrival Window</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {['9 AM - 12 PM', '1 PM - 4 PM', '5 PM - 8 PM', 'Immediate'].map((slot) => (
-                        <button key={slot} className="p-5 border-2 border-slate-100 rounded-[1.5rem] font-bold text-sm text-slate-600 hover:border-indigo-600 hover:bg-indigo-50 transition-all">
-                          {slot}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                <p className="text-zinc-400 text-sm leading-relaxed mb-8">{selectedProperty.desc}</p>
 
-                  <div className="space-y-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Add Voice/Text Note</p>
-                    <textarea 
-                      placeholder="Describe the issue in detail..."
-                      className="w-full p-6 bg-slate-50 border-none rounded-[1.5rem] min-h-[120px] font-medium outline-none focus:ring-2 ring-indigo-100"
-                    />
-                  </div>
-
-                  <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white flex items-center justify-between shadow-2xl shadow-indigo-200">
-                    <div>
-                      <p className="text-xs font-black text-indigo-200 uppercase tracking-widest mb-1">Total Pay</p>
-                      <p className="text-4xl font-black">₹449</p>
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  {[
+                    { icon: <Wrench />, label: 'Skills', val: selectedProperty.category },
+                    { icon: <Zap />, label: 'Speed', val: 'Fast Response' },
+                    { icon: <Clock />, label: 'Type', val: selectedProperty.type },
+                  ].map((feat) => (
+                    <div key={feat.label} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center gap-4">
+                      <div className="text-cyan-400">{feat.icon}</div>
+                      <div>
+                        <p className="text-[10px] font-black text-zinc-500 uppercase">{feat.label}</p>
+                        <p className="text-sm font-bold">{feat.val}</p>
+                      </div>
                     </div>
-                    <button className="px-10 py-5 bg-white text-indigo-600 rounded-[1.5rem] font-black uppercase tracking-widest text-sm shadow-xl hover:scale-105 transition-all">
-                      Confirm & Pay
-                    </button>
-                  </div>
+                  ))}
+                </div>
+
+                <div className="mt-auto bg-black/40 border border-white/5 p-6 rounded-[2rem]">
+                  {!paymentSuccess ? (
+                    <div className="flex flex-col gap-4">
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Booking Fee</p>
+                          <p className="text-3xl font-black text-white">₹{(selectedProperty.price * 0.1).toLocaleString()}</p>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Base Rate</p>
+                           <p className="text-lg font-bold text-zinc-300">₹{selectedProperty.price.toLocaleString()}</p>
+                        </div>
+                      </div>
+                        <button 
+                          onClick={() => setShowBookingForm(true)}
+                          disabled={selectedProperty.isBooked}
+                          className="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 py-4 rounded-2xl font-bold uppercase tracking-widest text-sm hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50 text-white"
+                        >
+                        {isPaying ? <Loader2 className="animate-spin" /> : 'Hire Professional'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <CheckCircle size={48} className="text-cyan-400 mx-auto mb-4" />
+                      <h3 className="text-2xl font-black mb-1">Hired Successfully!</h3>
+                      <p className="text-zinc-400 text-xs mb-6">Booking ID: #WK_{Math.floor(Math.random()*100000)}</p>
+                      <button onClick={() => setSelectedProperty(null)} className="w-full bg-white/10 py-3 rounded-xl font-bold uppercase text-xs hover:bg-white/20 transition-colors">Close</button>
+                    </div>
+                  )}
                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- BOOKING FORM MODAL --- */}
+      <AnimatePresence>
+        {showBookingForm && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[2.5rem] p-8 w-full max-w-md relative shadow-2xl">
+              <button onClick={() => setShowBookingForm(false)} className="absolute top-6 right-6 text-zinc-400 hover:text-white transition-colors"><X size={20}/></button>
+              <h2 className="text-2xl font-black text-white mb-1">Book Worker</h2>
+              <p className="text-zinc-400 text-sm mb-6 font-medium">Leave your details for the worker.</p>
+              
+              <form onSubmit={handleBookingSubmit} className="space-y-4 text-white">
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Your Name</label>
+                  <input required value={bookingData.name} onChange={e=>setBookingData({...bookingData, name: e.target.value})} placeholder="John Doe" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Phone Number</label>
+                  <input required type="number" value={bookingData.phone} onChange={e=>setBookingData({...bookingData, phone: e.target.value})} placeholder="9999999999" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Preferred Date</label>
+                  <input required type="date" value={bookingData.date} onChange={e=>setBookingData({...bookingData, date: e.target.value})} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium [color-scheme:dark]" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Message (Optional)</label>
+                  <textarea value={bookingData.message} onChange={e=>setBookingData({...bookingData, message: e.target.value})} placeholder="Any specific requirements?" rows={2} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium"></textarea>
+                </div>
+                
+                <button disabled={isBooking} type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-xl font-bold uppercase tracking-widest mt-2 hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50">
+                  {isBooking ? <Loader2 className="animate-spin" /> : 'Confirm Request'}
+                </button>
+              </form>
             </motion.div>
           </div>
         )}

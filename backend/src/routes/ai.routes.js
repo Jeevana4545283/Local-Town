@@ -3,13 +3,7 @@ const { z } = require("zod");
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const { RentalListing } = require("../models/RentalListing");
-const { WorkerProfile } = require("../models/WorkerProfile");
-const { Offer } = require("../models/Offer");
-const { Event } = require("../models/Event");
-const { Alert } = require("../models/Alert");
-const { RealEstateListing } = require("../models/RealEstateListing");
-const { ChatMessage } = require("../models/ChatMessage");
+const prisma = require("../prisma");
 
 const router = express.Router();
 
@@ -54,70 +48,25 @@ router.post("/chat", async (req, res) => {
 
     const msg = body.message.trim();
 
-    // Save User Message
-    await ChatMessage.create({
-      role: "user",
-      text: msg,
-    });
+    // Save User Message (skipped for now as ChatMessage model removed)
 
     // Search Query
     const q = msg.slice(0, 120);
 
-    // Fetch Data From MongoDB
+    // Fetch Data From Prisma
     const [
       rentals,
       workers,
       offers,
       events,
-      alerts,
-      realEstate,
     ] = await Promise.all([
-      RentalListing.find(
-        q
-          ? {
-              $text: { $search: q },
-              isActive: true,
-            }
-          : { isActive: true }
-      )
-        .sort({ createdAt: -1 })
-        .limit(4),
-
-      WorkerProfile.find({})
-        .sort({ createdAt: -1 })
-        .limit(4)
-        .populate("user", "name phone"),
-
-      Offer.find(
-        q
-          ? {
-              $text: { $search: q },
-              isActive: true,
-            }
-          : { isActive: true }
-      )
-        .sort({ createdAt: -1 })
-        .limit(4),
-
-      Event.find({ isActive: true })
-        .sort({ startsAt: 1 })
-        .limit(4),
-
-      Alert.find({ isActive: true })
-        .sort({ createdAt: -1 })
-        .limit(3),
-
-      RealEstateListing.find(
-        q
-          ? {
-              $text: { $search: q },
-              isActive: true,
-            }
-          : { isActive: true }
-      )
-        .sort({ createdAt: -1 })
-        .limit(4),
+      prisma.rental.findMany({ orderBy: { createdAt: 'desc' }, take: 4 }),
+      prisma.worker.findMany({ orderBy: { createdAt: 'desc' }, take: 4 }),
+      prisma.offer.findMany({ orderBy: { createdAt: 'desc' }, take: 4 }),
+      prisma.event.findMany({ take: 4 }),
     ]);
+    const alerts = [];
+    const realEstate = [];
 
     // Gemini Model
     // NOTE: Your logs show 404 for both flash-latest and pro-latest.
@@ -324,18 +273,7 @@ router.post("/chat", async (req, res) => {
       }
     }
 
-    // Save AI Reply
-    try {
-      await ChatMessage.create({
-        role: "assistant",
-        text: aiReply,
-      });
-    } catch (dbErr) {
-      console.log(
-        "Chat save failed:",
-        dbErr
-      );
-    }
+    // Save AI Reply (skipped for now)
 
     // Send Response
     res.json({
@@ -368,24 +306,11 @@ router.post("/chat", async (req, res) => {
 // ======================================
 router.get("/history", async (req, res) => {
   try {
-    const messages =
-      await ChatMessage.find()
-        .sort({ createdAt: 1 })
-        .limit(50);
-
-    res.json({
-      success: true,
-      messages,
-    });
-
+    const messages = []
+    res.json({ success: true, messages })
   } catch (err) {
-    console.log(err);
-
-    res.status(500).json({
-      success: false,
-      messages: [],
-    });
+    res.status(500).json({ success: false, messages: [] })
   }
-});
+})
 
 module.exports = router;

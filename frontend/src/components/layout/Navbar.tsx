@@ -1,18 +1,20 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, ChevronDown, Moon, Search, Sun, Zap } from 'lucide-react'
+import { Bell, ChevronDown, Moon, Search, Sun, Zap, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
-import { clearSession, getUser } from '../../lib/auth'
+import { clearSession, getUser, setSession } from '../../lib/auth'
+import { api } from '../../lib/api'
 import { useTheme } from '../../lib/theme'
 import { useDemoNotifications } from '../../demo/useDemoStream'
 
 const nav = [
   { to: '/rentals', label: 'Rentals' },
+  { to: '/services', label: 'Services' },
   { to: '/workers', label: 'Workers' },
   { to: '/offers', label: 'Offers' },
   { to: '/events', label: 'Events' },
-  { to: '/services', label: 'Services' },
+  { to: '/emergency', label: 'Emergency' },
   { to: '/marketplace', label: 'Marketplace' },
 ]
 
@@ -22,6 +24,41 @@ export function Navbar() {
   const [open, setOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const navTo = useNavigate()
+  const [showOwnerModal, setShowOwnerModal] = useState(false)
+  const [ownerCategories, setOwnerCategories] = useState<string[]>([])
+  const [pendingOwnerToken, setPendingOwnerToken] = useState<{token: string, user: any} | null>(null)
+
+  const handleSwitchRole = async () => {
+    try {
+      const res = await api.post('/auth/switch-role')
+      
+      if (res.data.user.role === 'user') {
+        setSession(res.data.token, res.data.user)
+        navTo('/dashboard')
+        setOpen(false)
+        return
+      }
+      
+      if (res.data.user.role === 'OWNER' || res.data.user.role === 'owner') {
+        const categories = res.data.user.categories || []
+        
+        if (categories.length === 0) {
+          setSession(res.data.token, res.data.user)
+          navTo('/owner/profile')
+        } else {
+          setPendingOwnerToken({ token: res.data.token, user: res.data.user })
+          setOwnerCategories(categories)
+          setShowOwnerModal(true)
+        }
+        setOpen(false)
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Alternate account not found. Please sign up first.')
+      navTo('/signup')
+      setOpen(false)
+    }
+  }
+
   const demoNotif = useDemoNotifications()
 
   const initials = useMemo(() => {
@@ -169,7 +206,7 @@ export function Navbar() {
                   </div>
                   <div className="hidden text-left sm:block">
                     <div className="text-xs font-semibold text-zinc-900 dark:text-white">{user.name}</div>
-                    <div className="text-[11px] text-zinc-600 dark:text-zinc-300">{user.role}</div>
+                    <div className="text-[10px] font-bold tracking-wider text-indigo-600 dark:text-indigo-400 uppercase">{(user.role as any) === 'OWNER' ? 'OWNER' : 'USER'}</div>
                   </div>
                   <ChevronDown className="size-4 text-zinc-700 dark:text-zinc-200" />
                 </button>
@@ -186,9 +223,27 @@ export function Navbar() {
                       <Link to="/dashboard" className="block px-4 py-3 text-sm text-zinc-900 hover:bg-white/10 dark:text-white">
                         Dashboard
                       </Link>
+                      <Link to="/profile" className="block px-4 py-3 text-sm text-zinc-900 hover:bg-white/10 dark:text-white">
+                        Profile
+                      </Link>
                       <Link to="/admin" className="block px-4 py-3 text-sm text-zinc-900 hover:bg-white/10 dark:text-white">
                         Admin
                       </Link>
+                      {user?.role === 'user' ? (
+                        <button
+                          onClick={handleSwitchRole}
+                          className="block w-full border-t border-white/5 px-4 py-3 text-left text-sm font-medium text-indigo-600 hover:bg-white/10 dark:text-indigo-400"
+                        >
+                          Switch to Owner Portal
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleSwitchRole}
+                          className="block w-full border-t border-white/5 px-4 py-3 text-left text-sm font-medium text-indigo-600 hover:bg-white/10 dark:text-indigo-400"
+                        >
+                          Switch to User Mode
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           clearSession()
@@ -219,6 +274,57 @@ export function Navbar() {
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {showOwnerModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-sm rounded-3xl border border-white/20 bg-white/80 p-6 shadow-2xl backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/90"
+            >
+              <div className="mb-6 flex items-center justify-between">
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Choose Owner Portal</h3>
+                <button
+                  onClick={() => setShowOwnerModal(false)}
+                  className="rounded-full p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors dark:hover:bg-zinc-800 dark:hover:text-white"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {['Rentals', 'Services', 'Workers', 'Offers', 'Events', 'Marketplace'].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      if (pendingOwnerToken) {
+                        setSession(pendingOwnerToken.token, pendingOwnerToken.user)
+                        // Add this new category to their local categories if it wasn't there
+                        const updatedCats = Array.from(new Set([...ownerCategories, cat]))
+                        localStorage.setItem('lt_owner_categories', JSON.stringify(updatedCats))
+                        const c = cat.toLowerCase()
+                        if (c === 'rentals') navTo('/owner/rentals-dashboard')
+                        else if (c === 'services') navTo('/owner/services-dashboard')
+                        else if (c === 'workers') navTo('/owner/workers-dashboard')
+                        else if (c === 'offers') navTo('/owner/offers-dashboard')
+                        else if (c === 'events') navTo('/owner/events-dashboard')
+                        else if (c === 'marketplace') navTo('/owner/marketplace-dashboard')
+                        else navTo('/owner-dashboard')
+                        setShowOwnerModal(false)
+                      }
+                    }}
+                    className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left font-semibold text-zinc-800 shadow-sm transition-all hover:border-indigo-500 hover:ring-1 hover:ring-indigo-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </header>
   )
 }

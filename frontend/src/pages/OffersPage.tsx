@@ -1,258 +1,621 @@
-import { useEffect, useState, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
-  Store, Clock, Check, Sparkles, Zap, Search,
-  Flame, Star, MapPin,
-  Plus, X, Camera, Percent
-} from 'lucide-react'
+  Search, MapPin, Star, Heart, 
+  Tag, X, Loader2, CheckCircle,
+  ArrowUpRight, ShieldCheck, Camera,
+  Percent, Clock, Zap, Plus, ChevronLeft,
+  Bookmark, MessageCircle, Send
+} from 'lucide-react';
 
-// --- Types ---
-type Offer = { 
-  _id: string; 
-  shopName: string; 
-  title: string; 
-  description?: string;
-  discount: string;
-  expiryMinutes: number;
-  category: string;
-  code?: string;
-  image: string;
+// --- Enhanced Types ---
+interface Offer {
+  id: string;
+  title: string;
+  price: number;
+  city: string;
+  street: string;
+  category: 'Fashion' | 'Tech' | 'Food' | 'Grocery';
+  type: 'Flat' | 'BOGO' | 'Percentage';
+  nearby: string[];
   rating: number;
+  reviewsCount: number;
+  img: string[];
+  desc: string;
+  isBooked: boolean;
+  isVerified: boolean;
+  amenities: string[];
 }
 
-export function OffersPage() {
-  const [items, setItems] = useState<Offer[]>([])
-  // const [loading, setLoading] = useState(true)
 
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [activeCategory, setActiveCategory] = useState('All')
-  const [isAddOfferOpen, setIsAddOfferOpen] = useState(false)
+import { useEffect } from 'react';
+
+export function OffersPage() {
+  const [properties, setProperties] = useState<Offer[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<Offer | null>(null);
+  const [isPaying, setIsPaying] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
+
+  // --- Booking Form State ---
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [bookingData, setBookingData] = useState({ name: '', phone: '', date: '', message: '' });
+  const [isBooking, setIsBooking] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // --- Social Features State ---
+  const [offerStats, setOfferStats] = useState({ likesCount: 0, isLiked: false, isSaved: false });
+  const [comments, setComments] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [showComments, setShowComments] = useState(false);
+  const [isLikeLoading, setIsLikeLoading] = useState(false);
+  const [isSaveLoading, setIsSaveLoading] = useState(false);
+
+  const getUserId = () => {
+    let id = localStorage.getItem('lt_guest_id')
+    if (!id) {
+      id = 'guest-' + Math.random().toString(36).substr(2, 9)
+      localStorage.setItem('lt_guest_id', id)
+    }
+    return id
+  }
+
+  const navigate = useNavigate();
+
+  // --- Advanced Filter State ---
+  const [filters, setFilters] = useState({
+    city: 'All',
+    category: 'All',
+    type: 'All',
+  });
 
   useEffect(() => {
-    const fetchOffers = async () => {
-    		// setLoading(false)
+    fetch('http://localhost:4000/api/offers')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.items) {
+          const mapped: Offer[] = data.items.map((o: any) => ({
+            id: o.id,
+            title: o.title || 'Unknown Offer',
+            price: o.discountPrice || 0,
+            city: o.address?.split(',')[0] || 'Unknown',
+            street: o.address || '',
+            category: 'Fashion',
+            type: 'Flat',
+            nearby: o.nearbyAreas || [],
+            rating: 4.8,
+            reviewsCount: Math.floor(Math.random() * 50) + 10,
+            img: o.imageUrls?.length ? o.imageUrls : ['https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80'],
+            desc: o.description || 'Great offer.',
+            isBooked: o.status === 'Booked',
+            isVerified: true,
+            amenities: []
+          }));
+          setProperties(mapped);
+        }
+      })
+      .catch((err) => console.error("Failed to load offers:", err))
+      .finally(() => setLoading(false));
+  }, []);
 
-      const demoData: Offer[] = [
-        { _id: '1', shopName: 'Fresh Mart', title: 'Organic Produce Blowout', description: 'Massive discounts on all farm-fresh organic produce and premium dairy.', discount: '50% OFF', expiryMinutes: 45, category: 'Grocery', code: 'FRESH50', image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=1000', rating: 4.8 },
-        { _id: '2', shopName: 'Tech Hub', title: 'Pro Gaming Setup Gear', description: 'Mechanical keyboards and RGB wireless mice for professional e-sports.', discount: '₹1000 OFF', expiryMinutes: 12, category: 'Tech', code: 'GAMER', image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1000', rating: 4.9 },
-        { _id: '3', shopName: 'Style Studio', title: 'Luxury Cotton Wear', description: 'Premium summer collection. Sustainable fabrics, modern cuts.', discount: 'BOGO', expiryMinutes: 120, category: 'Fashion', code: 'SUMMER', image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1000', rating: 4.7 },
-        { _id: '4', shopName: 'The Bakehouse', title: 'Artisan Pastry Rush', description: 'Freshly baked sourdough and French pastries at half price.', discount: 'FLAT 50%', expiryMinutes: 30, category: 'Food', code: 'BAKE', image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?q=80&w=1000', rating: 4.5 },
-      ]
-      setItems(demoData)
+  // --- Social Data Fetching ---
+  useEffect(() => {
+    if (selectedProperty) {
+      const token = localStorage.getItem('lt_token');
+      // Fetch stats
+      fetch(`http://localhost:4000/api/offers/${selectedProperty.id}/like-status`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      }).then(res => res.json()).then(data => {
+        if (!data.message) setOfferStats(data);
+      }).catch(console.error);
+
+      // Fetch comments
+      fetch(`http://localhost:4000/api/offers/${selectedProperty.id}/comments`)
+        .then(res => res.json()).then(data => {
+          if (data.items) setComments(data.items);
+        }).catch(console.error);
+    } else {
+      setShowComments(false);
     }
-    fetchOffers()
-  }, [])
+  }, [selectedProperty]);
 
-  const categories = ['All', 'Fashion', 'Tech', 'Food', 'Grocery']
+  // --- Smart Search & Filtering Logic ---
+  const filteredProperties = useMemo(() => {
+    return properties.filter(p => {
+      const matchesSearch = 
+        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.street.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.nearby.some(n => n.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const matchesCity = filters.city === 'All' || p.city === filters.city;
+      const matchesCategory = filters.category === 'All' || p.category === filters.category;
+      const matchesType = filters.type === 'All' || p.type === filters.type;
 
-  const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) || item.shopName.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesCategory = activeCategory === 'All' || item.category === activeCategory
-      return matchesSearch && matchesCategory
-    })
-  }, [items, searchQuery, activeCategory])
+      return matchesSearch && matchesCity && matchesCategory && matchesType;
+    });
+  }, [properties, searchQuery, filters]);
 
-  const handleCopy = (code: string, id: string) => {
-    navigator.clipboard.writeText(code)
-    setCopiedId(id)
-    setTimeout(() => setCopiedId(null), 2000)
-  }
+  // --- Functions ---
+  const toggleFavorite = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  };
 
-  const addNewOffer = (newOffer: any) => {
-    setItems([newOffer, ...items])
-    setIsAddOfferOpen(false)
-  }
+  const toggleLike = async () => {
+    const token = localStorage.getItem('lt_token');
+    if (!token) return alert('Please login first');
+    setIsLikeLoading(true);
+    try {
+      const res = await fetch(`http://localhost:4000/api/offers/${selectedProperty?.id}/like`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOfferStats(prev => ({
+          ...prev,
+          isLiked: data.isLiked,
+          likesCount: prev.likesCount + (data.isLiked ? 1 : -1)
+        }));
+      }
+    } finally {
+      setIsLikeLoading(false);
+    }
+  };
+
+  const toggleSave = async () => {
+    const token = localStorage.getItem('lt_token');
+    if (!token) return alert('Please login first');
+    setIsSaveLoading(true);
+    try {
+      const res = await fetch(`http://localhost:4000/api/offers/${selectedProperty?.id}/save`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOfferStats(prev => ({ ...prev, isSaved: data.isSaved }));
+      }
+    } finally {
+      setIsSaveLoading(false);
+    }
+  };
+
+  const postComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    const token = localStorage.getItem('lt_token');
+    if (!token) return alert('Please login first');
+    try {
+      const res = await fetch(`http://localhost:4000/api/offers/${selectedProperty?.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ comment: newComment })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setComments([data.item, ...comments]);
+        setNewComment("");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleBookingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProperty) return;
+    
+    setIsBooking(true);
+    try {
+      const res = await fetch('http://localhost:4000/api/offers-bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          offerId: selectedProperty.id,
+          userName: bookingData.name || 'Guest',
+          userPhone: bookingData.phone || '0000000000',
+          visitDate: bookingData.date || new Date().toISOString(),
+          message: bookingData.message,
+          userId: getUserId()
+        })
+      });
+      if (res.ok) {
+        setPaymentSuccess(true);
+        setShowBookingForm(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsBooking(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#FDFDFF] dark:bg-zinc-950">
-      {/* --- FLASH DEALS TICKER --- */}
-      <div className="bg-zinc-900 py-3 overflow-hidden whitespace-nowrap">
-        <motion.div animate={{ x: [0, -1000] }} transition={{ repeat: Infinity, duration: 30, ease: "linear" }} className="flex gap-10 items-center text-white font-bold text-sm tracking-widest">
-          {[...Array(10)].map((_, i) => (
-            <div key={`ticker-${i}`} className="flex items-center gap-2">
-              <Flame className="text-orange-500 size-4" /> <span>MALL-WIDE FLASH SALE ENDS IN 04:55:12</span>
-              <span className="text-zinc-600">•</span> <span>FREE PARKING FOR PURCHASES OVER ₹2000</span>
-            </div>
-          ))}
-        </motion.div>
+    <div className="relative h-screen w-screen overflow-hidden bg-zinc-950 font-sans text-white">
+      
+      {/* --- PREMIUM BACKGROUND --- */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900" />
+        <div className="absolute -left-32 -top-32 size-[40rem] rounded-full bg-cyan-500/20 blur-[100px]" />
+        <div className="absolute -right-32 bottom-0 size-[40rem] rounded-full bg-purple-500/20 blur-[100px]" />
+        <div className="absolute left-1/3 top-1/2 size-[30rem] -translate-y-1/2 rounded-full bg-indigo-500/10 blur-[100px]" />
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 py-12">
-        {/* --- HEADER SECTION --- */}
-        <header className="mb-16">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6">
-              <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
-                <Sparkles className="size-4 animate-spin-slow" />
-                <span className="text-xs font-black uppercase tracking-widest">New Rewards Available</span>
+      {/* --- MAIN GLASS CONTAINER --- */}
+      <div className="relative z-10 flex h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] m-4 overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] backdrop-blur-2xl">
+        
+        {/* --- LEFT SIDEBAR --- */}
+        <aside className="flex w-[260px] flex-col border-r border-white/10 bg-black/20 p-6">
+          <div className="mb-10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg">
+                <Tag size={18} />
               </div>
-              <h1 className="text-7xl font-black tracking-tighter text-zinc-900 dark:text-white leading-[0.9]">
-                Unlock <br /> The <span className="text-indigo-600 italic font-serif">City.</span>
-              </h1>
-              <div className="flex flex-wrap gap-4 pt-4">
-                <button onClick={() => setIsAddOfferOpen(true)} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center gap-2">
-                  <Plus size={20} /> List Your Offer
-                </button>
-                <button className="bg-white border border-zinc-200 text-zinc-600 px-8 py-4 rounded-2xl font-bold hover:bg-zinc-50 transition-all">
-                  Mall Map
-                </button>
-              </div>
+              <span className="text-xl font-bold tracking-tight text-white">LocalTown</span>
             </div>
+            <button onClick={() => navigate(-1)} className="grid size-8 place-items-center rounded-full bg-white/5 hover:bg-white/10 transition">
+              <ChevronLeft size={18} className="text-zinc-300" />
+            </button>
+          </div>
 
-            <div className="relative bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] shadow-2xl border border-zinc-100">
-              <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Search className="text-indigo-600" /> Find a Store</h3>
-              <input 
-                type="text" placeholder="Search brands or categories..." value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-zinc-50 dark:bg-zinc-800 p-5 rounded-2xl border-none outline-none ring-2 ring-transparent focus:ring-indigo-600/20 mb-4 transition-all"
-              />
-              <div className="flex flex-wrap gap-2">
-                {categories.map(cat => (
-                  <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeCategory === cat ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500'}`}>
-                    {cat}
-                  </button>
+          {/* Filters Sidebar */}
+          <div className="flex flex-1 flex-col gap-8 overflow-y-auto custom-scrollbar pr-2 mt-4">
+            
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Store Category</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Fashion', 'Tech', 'Food', 'Grocery'].map(c => (
+                  <label key={c} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, category: c})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.category === c ? 'border-cyan-500 bg-cyan-500/20 text-cyan-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.category === c && <div className="size-2.5 rounded-sm bg-cyan-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.category === c ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{c}</span>
+                  </label>
                 ))}
               </div>
             </div>
-          </div>
-        </header>
 
-        {/* --- OFFERS GRID --- */}
-        <main>
-          <AnimatePresence mode="popLayout">
-            <motion.div layout className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredItems.map((offer, idx) => (
-                <OfferCard key={offer._id} offer={offer} onCopy={handleCopy} isCopied={copiedId === offer._id} index={idx} />
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Deal Type</p>
+              <div className="flex flex-col gap-3">
+                {['All', 'Flat', 'BOGO', 'Percentage'].map(t => (
+                  <label key={t} className="flex items-center gap-3 cursor-pointer group" onClick={() => setFilters({...filters, type: t})}>
+                    <div className={`grid size-5 place-items-center rounded-md border transition-all ${filters.type === t ? 'border-indigo-500 bg-indigo-500/20 text-indigo-400' : 'border-white/20 bg-white/5 group-hover:border-white/40'}`}>
+                      {filters.type === t && <div className="size-2.5 rounded-sm bg-indigo-400" />}
+                    </div>
+                    <span className={`text-sm font-medium ${filters.type === t ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>{t === 'All' ? 'Any' : t}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+          <button 
+            onClick={() => setShowAddForm(true)}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:scale-105"
+          >
+            <Plus size={18}/> List Offer
+          </button>
+        </aside>
+
+        {/* --- RIGHT CONTENT AREA --- */}
+        <main className="flex flex-1 flex-col overflow-y-auto custom-scrollbar relative">
+          
+          <header className="sticky top-0 z-50 border-b border-white/10 bg-white/5 backdrop-blur-xl px-8 py-6 flex flex-col md:flex-row gap-6 md:items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-black text-white">Find local deals</h1>
+              <p className="mt-1 text-sm font-medium text-zinc-400">Discover premium offers in your area.</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10 w-[300px]">
+                <Search size={18} className="text-zinc-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search brands, deals..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent text-sm font-medium text-white placeholder-zinc-500 outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl bg-black/30 px-4 py-2 border border-white/10">
+                <MapPin size={18} className="text-zinc-400" />
+                <select 
+                  onChange={(e) => setFilters({...filters, city: e.target.value})}
+                  className="w-[120px] bg-transparent text-sm font-medium text-white outline-none appearance-none"
+                >
+                  <option className="bg-zinc-900" value="All">All Cities</option>
+                  <option className="bg-zinc-900" value="Hyderabad">Hyderabad</option>
+                  <option className="bg-zinc-900" value="Bangalore">Bangalore</option>
+                  <option className="bg-zinc-900" value="Pune">Pune</option>
+                </select>
+              </div>
+            </div>
+          </header>
+
+          <div className="p-8">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex gap-4">
+                {['Flash Deals', 'Popular', 'Ending Soon'].map((tab, i) => (
+                  <span key={tab} className={`text-sm font-bold cursor-pointer transition-colors ${i === 0 ? 'text-cyan-400 border-b-2 border-cyan-400 pb-1' : 'text-zinc-500 hover:text-zinc-300'}`}>{tab}</span>
+                ))}
+              </div>
+              <p className="text-sm font-medium text-zinc-500">{filteredProperties.length} Offers Found</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredProperties.map((p, idx) => (
+                <motion.div 
+                  key={p.id} 
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.05 }}
+                  whileHover={{ y: -8 }}
+                  onClick={() => { setSelectedProperty(p); setPaymentSuccess(false); setActiveImgIdx(0); }}
+                  className={`group relative flex flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-md cursor-pointer transition-all hover:bg-white/10 hover:shadow-cyan-500/10 ${p.isBooked ? 'opacity-60' : ''}`}
+                >
+                  <div className="relative h-64 overflow-hidden">
+                    <img src={p.img[0]} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    
+                    <div className="absolute left-4 top-4 flex flex-col gap-2">
+                      {p.isBooked && <span className="rounded-full bg-red-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm">Expired</span>}
+                      {p.isVerified && <span className="flex items-center gap-1 rounded-full bg-cyan-500/90 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm"><ShieldCheck size={12}/> Verified</span>}
+                    </div>
+
+                    <div className="absolute right-4 top-4">
+                      <button 
+                        onClick={(e) => toggleFavorite(e, p.id)}
+                        className={`grid size-10 place-items-center rounded-full backdrop-blur-md transition-all border border-white/20 ${favorites.includes(p.id) ? 'bg-red-500/90 text-white' : 'bg-black/40 text-white hover:bg-black/60'}`}
+                      >
+                        <Heart size={18} fill={favorites.includes(p.id) ? "currentColor" : "none"} />
+                      </button>
+                    </div>
+
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h3 className="text-xl font-bold leading-tight text-white">{p.title}</h3>
+                      <p className="mt-1 flex items-center gap-1 text-sm font-medium text-zinc-300">
+                        <MapPin size={14} className="text-cyan-400" /> {p.street}, {p.city}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-6">
+                    <div className="mb-6 flex items-center justify-between">
+                      <div className="flex flex-wrap gap-2">
+                        {p.amenities.slice(0,3).map(a => (
+                          <span key={a} className="rounded-lg bg-white/10 px-2 py-1 text-[10px] font-bold text-zinc-300 border border-white/5">{a}</span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-xs font-bold text-yellow-400 border border-white/5">
+                        <Star size={12} fill="currentColor" /> {p.rating}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto flex items-end justify-between border-t border-white/10 pt-4">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Discount</p>
+                        <div className="text-2xl font-black text-white">{p.type === 'Percentage' ? `${p.price}% OFF` : p.type === 'Flat' ? `₹${p.price} OFF` : 'BOGO'}</div>
+                      </div>
+                      <button className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg transition-transform group-hover:scale-110">
+                        <ArrowUpRight size={22} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
               ))}
-            </motion.div>
-          </AnimatePresence>
+            </div>
+          </div>
         </main>
       </div>
 
-      {/* --- ADD OFFER SLIDE-OVER --- */}
+      {/* --- ADD OFFER MODAL --- */}
       <AnimatePresence>
-        {isAddOfferOpen && (
-          <AddOfferModal onClose={() => setIsAddOfferOpen(false)} onSubmit={addNewOffer} />
+        {showAddForm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[3rem] p-10 w-full max-w-lg relative shadow-2xl">
+              <button onClick={() => setShowAddForm(false)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors"><X size={24}/></button>
+              <h2 className="text-3xl font-black mb-2">List Your Offer</h2>
+              <p className="text-zinc-400 text-sm mb-8 font-medium">Join 500+ premium stores today.</p>
+              
+              <div className="space-y-4">
+                <div className="h-32 border-2 border-dashed border-white/20 bg-white/5 rounded-3xl flex flex-col items-center justify-center text-zinc-400 hover:border-cyan-400 hover:text-cyan-400 transition-colors cursor-pointer group">
+                  <Camera size={28} className="mb-2" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Drop Promo Image</span>
+                </div>
+                <input type="text" placeholder="Offer Title" className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
+                <div className="flex gap-4">
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Hyderabad</option>
+                    <option>Bangalore</option>
+                  </select>
+                  <select className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium appearance-none">
+                    <option>Fashion</option>
+                    <option>Tech</option>
+                  </select>
+                </div>
+                <div className="flex gap-4">
+                  <input type="number" placeholder="Discount Amount" className="flex-1 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-cyan-500 text-sm font-medium placeholder-zinc-500" />
+                </div>
+                <button className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-2xl font-bold uppercase tracking-widest mt-4 hover:shadow-lg hover:shadow-cyan-500/20 transition-all">Submit Offer</button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
-    </div>
-  )
-}
 
-// --- SUB-COMPONENT: ADD OFFER FORM ---
-function AddOfferModal({ onClose, onSubmit }: { onClose: () => void, onSubmit: (offer: Offer) => void }) {
-  const [formData, setFormData] = useState({
-    shopName: '',
-    title: '',
-    discount: '',
-    category: 'Fashion',
-    expiry: '60',
-    code: ''
-  })
+      {/* --- DETAILED BOOKING MODAL --- */}
+      <AnimatePresence>
+        {selectedProperty && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xl">
+            <motion.div 
+              layoutId={selectedProperty.id} 
+              className="bg-zinc-900 border border-white/10 rounded-[2.5rem] w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl relative"
+            >
+              <button onClick={() => setSelectedProperty(null)} className="absolute top-4 right-4 z-50 grid size-10 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md md:hidden"><X size={18}/></button>
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-end">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-zinc-950/60 backdrop-blur-md" />
-      <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="relative h-full w-full max-w-xl bg-white p-12 shadow-2xl overflow-y-auto">
-        <button onClick={onClose} className="mb-12 text-zinc-400 hover:text-zinc-900 flex items-center gap-2 font-bold uppercase tracking-widest text-[10px]"><X size={20}/> Close Panel</button>
-        
-        <div className="mb-10">
-          <h2 className="text-5xl font-black tracking-tighter italic font-serif">Grow Your</h2>
-          <h2 className="text-5xl font-black tracking-tighter">Business.</h2>
-          <p className="mt-4 text-zinc-500 font-medium">List your flash deal and reach thousands of shoppers in the mall today.</p>
-        </div>
-
-        <form className="space-y-8" onSubmit={(e) => {
-          e.preventDefault();
-          onSubmit({
-            _id: Math.random().toString(),
-            ...formData,
-            expiryMinutes: parseInt(formData.expiry),
-            rating: 5.0,
-            image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?q=80&w=1000' // Default placeholder
-          });
-        }}>
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Store Identity</label>
-              <div className="relative">
-                <Store className="absolute left-0 top-1/2 -translate-y-1/2 text-zinc-300" size={20} />
-                <input required value={formData.shopName} onChange={e => setFormData({...formData, shopName: e.target.value})} type="text" placeholder="e.g. Zara Home" className="w-full border-b-2 border-zinc-100 pl-8 py-4 outline-none focus:border-indigo-600 transition-colors font-bold text-lg" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Offer Headline</label>
-              <input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} type="text" placeholder="e.g. Midnight Shoe Drop" className="w-full border-b-2 border-zinc-100 py-4 outline-none focus:border-indigo-600 transition-colors font-bold text-lg" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-8">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Discount Label</label>
-                <div className="relative">
-                  <Percent className="absolute left-0 top-1/2 -translate-y-1/2 text-zinc-300" size={18} />
-                  <input required value={formData.discount} onChange={e => setFormData({...formData, discount: e.target.value})} type="text" placeholder="70% OFF" className="w-full border-b-2 border-zinc-100 pl-8 py-4 outline-none focus:border-indigo-600 font-bold" />
+              <div className="md:w-1/2 relative bg-black">
+                <img src={selectedProperty.img[activeImgIdx]} className="w-full h-full object-cover opacity-90" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-zinc-900/50 hidden md:block" />
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
+                  {selectedProperty.img.map((img, i) => (
+                    <button key={i} onClick={() => setActiveImgIdx(i)} className={`h-1.5 rounded-full transition-all ${activeImgIdx === i ? 'w-8 bg-cyan-400' : 'w-2 bg-white/40'}`} />
+                  ))}
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Expires In (Mins)</label>
-                <div className="relative">
-                  <Clock className="absolute left-0 top-1/2 -translate-y-1/2 text-zinc-300" size={18} />
-                  <input required value={formData.expiry} onChange={e => setFormData({...formData, expiry: e.target.value})} type="number" className="w-full border-b-2 border-zinc-100 pl-8 py-4 outline-none focus:border-indigo-600 font-bold" />
+
+              <div className="md:w-1/2 flex flex-col p-8 overflow-y-auto custom-scrollbar bg-zinc-900/90 relative">
+                <button onClick={() => setSelectedProperty(null)} className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors hidden md:block"><X size={24}/></button>
+                
+                <div className="flex gap-3 mb-4">
+                  <span className="rounded-full bg-cyan-500/20 text-cyan-400 px-3 py-1 text-[10px] font-black uppercase tracking-widest border border-cyan-500/30">Limited Time</span>
+                </div>
+                
+                <h2 className="text-3xl font-black tracking-tight mb-2">{selectedProperty.title}</h2>
+                <div className="flex items-center gap-2 text-sm text-zinc-400 font-medium mb-6">
+                  <MapPin size={16} className="text-cyan-400" /> {selectedProperty.street}, {selectedProperty.city}
+                </div>
+
+                <p className="text-zinc-400 text-sm leading-relaxed mb-8">{selectedProperty.desc}</p>
+
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  {[
+                    { icon: <Percent />, label: 'Discount', val: selectedProperty.type === 'Percentage' ? `${selectedProperty.price}%` : 'Special' },
+                    { icon: <Zap />, label: 'Deal', val: 'Flash Sale' },
+                    { icon: <Clock />, label: 'Valid Until', val: 'Tonight' },
+                  ].map((feat) => (
+                    <div key={feat.label} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center gap-4">
+                      <div className="text-cyan-400">{feat.icon}</div>
+                      <div>
+                        <p className="text-[10px] font-black text-zinc-500 uppercase">{feat.label}</p>
+                        <p className="text-sm font-bold">{feat.val}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-4 mb-8 border-t border-white/10 pt-6">
+                  <button onClick={toggleLike} disabled={isLikeLoading} className={`flex items-center gap-2 rounded-2xl px-5 py-3 font-bold transition-all ${offerStats.isLiked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-white/5 text-zinc-300 border border-white/10 hover:bg-white/10'}`}>
+                    <Heart size={20} fill={offerStats.isLiked ? 'currentColor' : 'none'} />
+                    {offerStats.likesCount}
+                  </button>
+                  <button onClick={toggleSave} disabled={isSaveLoading} className={`flex items-center gap-2 rounded-2xl px-5 py-3 font-bold transition-all ${offerStats.isSaved ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-white/5 text-zinc-300 border border-white/10 hover:bg-white/10'}`}>
+                    <Bookmark size={20} fill={offerStats.isSaved ? 'currentColor' : 'none'} />
+                    {offerStats.isSaved ? 'Saved' : 'Save'}
+                  </button>
+                  <button onClick={() => setShowComments(!showComments)} className="flex items-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-5 py-3 font-bold text-zinc-300 transition-all hover:bg-white/10">
+                    <MessageCircle size={20} />
+                    {comments.length}
+                  </button>
+                </div>
+
+                <AnimatePresence>
+                  {showComments && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-8 overflow-hidden">
+                      <div className="flex flex-col gap-4 max-h-[250px] overflow-y-auto custom-scrollbar pr-2 mb-4">
+                        {comments.length === 0 && <p className="text-sm text-zinc-500 text-center py-4">No comments yet. Be the first!</p>}
+                        {comments.map((c: any) => (
+                          <div key={c.id} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="size-8 rounded-full bg-cyan-500/20 border border-cyan-500/30 grid place-items-center font-bold text-xs uppercase text-cyan-400">{c.user?.name?.charAt(0) || 'U'}</div>
+                              <div>
+                                <p className="text-sm font-bold">{c.user?.name || 'User'}</p>
+                                <p className="text-[10px] text-zinc-500">{new Date(c.createdAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <p className="text-sm text-zinc-300">{c.comment}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <form onSubmit={postComment} className="flex items-center gap-2 relative">
+                        <input type="text" value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Add a comment..." className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-4 pr-12 outline-none focus:border-cyan-500 text-sm" />
+                        <button type="submit" className="absolute right-2 grid size-8 place-items-center rounded-xl bg-cyan-500 text-white hover:bg-cyan-400 transition-colors">
+                          <Send size={14} />
+                        </button>
+                      </form>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="mt-auto bg-black/40 border border-white/5 p-6 rounded-[2rem]">
+                  {!paymentSuccess ? (
+                    <div className="flex flex-col gap-4">
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Action</p>
+                          <p className="text-3xl font-black text-white">Book a Visit</p>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Status</p>
+                           <p className="text-lg font-bold text-zinc-300">Available</p>
+                        </div>
+                      </div>
+                        <button 
+                          onClick={() => setShowBookingForm(true)}
+                          disabled={selectedProperty.isBooked}
+                          className="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 py-4 rounded-2xl font-bold uppercase tracking-widest text-sm hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50 text-white"
+                        >
+                        {isPaying ? <Loader2 className="animate-spin" /> : 'Schedule Visit'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <CheckCircle size={48} className="text-cyan-400 mx-auto mb-4" />
+                      <h3 className="text-2xl font-black mb-1">Visit Scheduled!</h3>
+                      <p className="text-zinc-400 text-xs mb-6">The shop owner has been notified.</p>
+                      <button onClick={() => setSelectedProperty(null)} className="w-full bg-white/10 py-3 rounded-xl font-bold uppercase text-xs hover:bg-white/20 transition-colors">Close</button>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Promo Code</label>
-                <input required value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} type="text" placeholder="e.g. SAVE20" className="w-full border-b-2 border-zinc-100 py-4 outline-none focus:border-indigo-600 font-bold tracking-widest uppercase text-indigo-600" />
-            </div>
-
-            <div className="border-2 border-dashed border-zinc-200 rounded-[2rem] p-10 text-center hover:border-indigo-600 hover:bg-indigo-50/50 cursor-pointer transition-all group">
-              <Camera className="mx-auto mb-3 text-zinc-300 group-hover:text-indigo-600" size={32} />
-              <p className="text-xs font-bold text-zinc-400">Drop your product photo here</p>
-            </div>
+            </motion.div>
           </div>
+        )}
+      </AnimatePresence>
 
-          <button type="submit" className="w-full py-6 bg-zinc-900 text-white rounded-[2rem] font-black text-lg shadow-xl hover:bg-indigo-600 hover:scale-[1.02] active:scale-95 transition-all">
-            Publish Offer Live
-          </button>
-        </form>
-      </motion.div>
+      {/* --- BOOKING FORM MODAL --- */}
+      <AnimatePresence>
+        {showBookingForm && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-zinc-900 border border-white/10 rounded-[2.5rem] p-8 w-full max-w-md relative shadow-2xl">
+              <button onClick={() => setShowBookingForm(false)} className="absolute top-6 right-6 text-zinc-400 hover:text-white transition-colors"><X size={20}/></button>
+              <h2 className="text-2xl font-black text-white mb-1">Schedule Visit</h2>
+              <p className="text-zinc-400 text-sm mb-6 font-medium">Leave your details to schedule.</p>
+              
+              <form onSubmit={handleBookingSubmit} className="space-y-4 text-white">
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Your Name</label>
+                  <input required value={bookingData.name} onChange={e=>setBookingData({...bookingData, name: e.target.value})} placeholder="John Doe" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Phone Number</label>
+                  <input required type="tel" value={bookingData.phone} onChange={e=>setBookingData({...bookingData, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})} placeholder="10-digit number" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Preferred Date</label>
+                  <input required type="date" value={bookingData.date} onChange={e=>setBookingData({...bookingData, date: e.target.value})} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium [color-scheme:dark]" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Message (Optional)</label>
+                  <textarea value={bookingData.message} onChange={e=>setBookingData({...bookingData, message: e.target.value})} placeholder="Any specific requirements?" rows={2} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-cyan-500 text-sm font-medium"></textarea>
+                </div>
+                
+                <button disabled={isBooking} type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 text-white py-4 rounded-xl font-bold uppercase tracking-widest mt-2 hover:shadow-lg hover:shadow-cyan-500/20 transition-all flex justify-center disabled:opacity-50">
+                  {isBooking ? <Loader2 className="animate-spin" /> : 'Confirm Visit'}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
-  )
-}
-
-// --- UPGRADED CARD COMPONENT (Shared) ---
-function OfferCard({ offer, onCopy, isCopied, index }: { offer: Offer, onCopy: any, isCopied: boolean, index: number }) {
-  return (
-    <motion.div layout initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }} className="group relative flex flex-col bg-white rounded-[2.5rem] overflow-hidden border border-zinc-100 shadow-xl shadow-zinc-200/40 hover:shadow-2xl transition-all">
-      <div className="relative h-56 overflow-hidden">
-        <img src={offer.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="" />
-        <div className="absolute inset-0 bg-gradient-to-t from-zinc-900/60 to-transparent" />
-        <div className="absolute bottom-6 left-6 flex items-center gap-2">
-          <div className="bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1"><Star className="size-3 text-amber-500 fill-amber-500" /> {offer.rating}</div>
-        </div>
-      </div>
-      <div className="p-8 space-y-4">
-        <div className="flex items-center justify-between">
-           <div className="flex items-center gap-2 text-zinc-400"><MapPin size={14} className="text-indigo-500" /><span className="text-xs font-black uppercase tracking-widest">{offer.shopName}</span></div>
-           <div className={`text-[10px] font-black px-2 py-1 rounded-md ${offer.expiryMinutes < 20 ? 'bg-red-100 text-red-600' : 'bg-zinc-100 text-zinc-500'}`}>{offer.expiryMinutes}M LEFT</div>
-        </div>
-        <h3 className="text-2xl font-black leading-tight group-hover:text-indigo-600 transition-colors">{offer.title}</h3>
-        <div className="flex items-center gap-4 py-4 border-y border-dashed border-zinc-100">
-           <div className="text-3xl font-black text-indigo-600">{offer.discount}</div>
-           <div className="text-[10px] font-bold text-zinc-400 uppercase leading-tight tracking-tighter">Limited Time<br/>Mall Exclusive</div>
-        </div>
-        <button onClick={() => onCopy(offer.code || 'MALL2026', offer._id)} className={`w-full py-5 rounded-[1.5rem] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 ${isCopied ? 'bg-emerald-500 text-white' : 'bg-zinc-900 text-white hover:bg-indigo-600'}`}>
-          {isCopied ? <><Check size={20} /> Applied</> : <><Zap size={20} className="fill-current" /> Reveal Code</>}
-        </button>
-      </div>
-      {/* Visual Ticket Cutouts */}
-      <div className="absolute top-[224px] -left-3 size-6 bg-[#FDFDFF] rounded-full" />
-      <div className="absolute top-[224px] -right-3 size-6 bg-[#FDFDFF] rounded-full" />
-    </motion.div>
-  )
+  );
 }

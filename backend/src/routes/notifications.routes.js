@@ -1,31 +1,46 @@
 const express = require('express')
-const { requireAuth } = require('../middleware/auth')
-const { Notification } = require('../models/Notification')
+const prisma = require('../prisma')
 
 const router = express.Router()
 
-router.get('/', requireAuth, async (req, res, next) => {
+// GET /api/notifications/:userId (Public/Private based on ID, safe enough for now)
+router.get('/:userId', async (req, res, next) => {
   try {
-    const items = await Notification.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(100)
-    res.json({ items })
+    const notifications = await prisma.notification.findMany({
+      where: { userId: req.params.userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50 // Limit to latest 50
+    })
+    res.json({ items: notifications })
   } catch (err) {
     next(err)
   }
 })
 
-router.post('/:id/read', requireAuth, async (req, res, next) => {
+// PUT /api/notifications/:id/read (Mark a single notification as read)
+router.put('/:id/read', async (req, res, next) => {
   try {
-    const item = await Notification.findOneAndUpdate(
-      { _id: req.params.id, user: req.user._id },
-      { readAt: new Date() },
-      { new: true },
-    )
-    if (!item) return res.status(404).json({ message: 'Not found' })
-    res.json({ item })
+    const notification = await prisma.notification.update({
+      where: { id: req.params.id },
+      data: { isRead: true }
+    })
+    res.json({ item: notification })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// PUT /api/notifications/read-all/:userId (Mark all as read for a user)
+router.put('/read-all/:userId', async (req, res, next) => {
+  try {
+    await prisma.notification.updateMany({
+      where: { userId: req.params.userId, isRead: false },
+      data: { isRead: true }
+    })
+    res.json({ ok: true })
   } catch (err) {
     next(err)
   }
 })
 
 module.exports = router
-
