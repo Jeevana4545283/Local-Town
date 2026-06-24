@@ -61,7 +61,7 @@ export function OwnerOffersPage() {
   const fetchOffers = async () => {
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch('http://localhost:4000/api/offers/my', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers/my`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (res.ok) {
@@ -126,8 +126,8 @@ export function OwnerOffersPage() {
     try {
       const token = localStorage.getItem('lt_token') || ''
       const url = editingId 
-        ? `http://localhost:4000/api/offers/${editingId}` 
-        : 'http://localhost:4000/api/offers'
+        ? `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers/${editingId}` 
+        : `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers`
       const method = editingId ? 'PUT' : 'POST'
 
       const res = await fetch(url, {
@@ -214,7 +214,7 @@ export function OwnerOffersPage() {
     if (!window.confirm('Are you sure you want to delete this offer?')) return
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch(`http://localhost:4000/api/offers/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })

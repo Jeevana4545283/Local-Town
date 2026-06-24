@@ -65,7 +65,7 @@ export function EventsPage() {
   });
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/events')
+    fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/events`)
       .then((res) => res.json())
       .then((data) => {
         if (data.items) {
@@ -121,7 +121,7 @@ export function EventsPage() {
     
     setIsBooking(true);
     try {
-      const res = await fetch('http://localhost:4000/api/events-bookings', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/events-bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

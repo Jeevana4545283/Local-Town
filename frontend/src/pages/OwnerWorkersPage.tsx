@@ -62,7 +62,7 @@ export function OwnerWorkersPage() {
   const fetchWorkers = async () => {
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch('http://localhost:4000/api/workers/my', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/workers/my`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (res.ok) {
@@ -124,8 +124,8 @@ export function OwnerWorkersPage() {
     try {
       const token = localStorage.getItem('lt_token') || ''
       const url = editingId 
-        ? `http://localhost:4000/api/workers/${editingId}` 
-        : 'http://localhost:4000/api/workers'
+        ? `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/workers/${editingId}` 
+        : `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/workers`
       const method = editingId ? 'PUT' : 'POST'
 
       const res = await fetch(url, {
@@ -215,7 +215,7 @@ export function OwnerWorkersPage() {
     if (!window.confirm('Are you sure you want to delete this worker?')) return
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch(`http://localhost:4000/api/workers/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/workers/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })

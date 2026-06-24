@@ -19,7 +19,7 @@ export function NotificationsDropdown({ userId }: NotificationProps) {
   const fetchNotifications = async () => {
     if (!userId) return
     try {
-      const res = await fetch(`http://localhost:4000/api/notifications/${userId}`)
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/notifications/${userId}`)
       if (res.ok) {
         const data = await res.json()
         setNotifications(data.items || [])
@@ -31,14 +31,14 @@ export function NotificationsDropdown({ userId }: NotificationProps) {
 
   const markAsRead = async (id: string) => {
     try {
-      await fetch(`http://localhost:4000/api/notifications/${id}/read`, { method: 'PUT' })
+      await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/notifications/${id}/read`, { method: 'PUT' })
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))
     } catch (err) {}
   }
 
   const markAllAsRead = async () => {
     try {
-      await fetch(`http://localhost:4000/api/notifications/read-all/${userId}`, { method: 'PUT' })
+      await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/notifications/read-all/${userId}`, { method: 'PUT' })
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
     } catch (err) {}
   }

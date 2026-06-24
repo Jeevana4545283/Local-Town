@@ -74,7 +74,7 @@ export function OffersPage() {
   });
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/offers')
+    fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers`)
       .then((res) => res.json())
       .then((data) => {
         if (data.items) {
@@ -107,14 +107,14 @@ export function OffersPage() {
     if (selectedProperty) {
       const token = localStorage.getItem('lt_token');
       // Fetch stats
-      fetch(`http://localhost:4000/api/offers/${selectedProperty.id}/like-status`, {
+      fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers/${selectedProperty.id}/like-status`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       }).then(res => res.json()).then(data => {
         if (!data.message) setOfferStats(data);
       }).catch(console.error);
 
       // Fetch comments
-      fetch(`http://localhost:4000/api/offers/${selectedProperty.id}/comments`)
+      fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers/${selectedProperty.id}/comments`)
         .then(res => res.json()).then(data => {
           if (data.items) setComments(data.items);
         }).catch(console.error);
@@ -150,7 +150,7 @@ export function OffersPage() {
     if (!token) return alert('Please login first');
     setIsLikeLoading(true);
     try {
-      const res = await fetch(`http://localhost:4000/api/offers/${selectedProperty?.id}/like`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers/${selectedProperty?.id}/like`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -172,7 +172,7 @@ export function OffersPage() {
     if (!token) return alert('Please login first');
     setIsSaveLoading(true);
     try {
-      const res = await fetch(`http://localhost:4000/api/offers/${selectedProperty?.id}/save`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers/${selectedProperty?.id}/save`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -191,7 +191,7 @@ export function OffersPage() {
     const token = localStorage.getItem('lt_token');
     if (!token) return alert('Please login first');
     try {
-      const res = await fetch(`http://localhost:4000/api/offers/${selectedProperty?.id}/comments`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers/${selectedProperty?.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ comment: newComment })
@@ -212,7 +212,7 @@ export function OffersPage() {
     
     setIsBooking(true);
     try {
-      const res = await fetch('http://localhost:4000/api/offers-bookings', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers-bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

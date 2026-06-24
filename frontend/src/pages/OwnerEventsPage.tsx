@@ -61,7 +61,7 @@ export function OwnerEventsPage() {
   const fetchEvents = async () => {
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch('http://localhost:4000/api/events/my', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/events/my`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (res.ok) {
@@ -124,8 +124,8 @@ export function OwnerEventsPage() {
     try {
       const token = localStorage.getItem('lt_token') || ''
       const url = editingId 
-        ? `http://localhost:4000/api/events/${editingId}` 
-        : 'http://localhost:4000/api/events'
+        ? `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/events/${editingId}` 
+        : `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/events`
       const method = editingId ? 'PUT' : 'POST'
 
       const res = await fetch(url, {
@@ -212,7 +212,7 @@ export function OwnerEventsPage() {
     if (!window.confirm('Are you sure you want to delete this event?')) return
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch(`http://localhost:4000/api/events/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/events/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })

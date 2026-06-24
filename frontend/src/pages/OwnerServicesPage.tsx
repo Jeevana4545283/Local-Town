@@ -61,7 +61,7 @@ export function OwnerServicesPage() {
   const fetchServices = async () => {
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch('http://localhost:4000/api/services/my', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/services/my`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (res.ok) {
@@ -123,8 +123,8 @@ export function OwnerServicesPage() {
     try {
       const token = localStorage.getItem('lt_token') || ''
       const url = editingId 
-        ? `http://localhost:4000/api/services/${editingId}` 
-        : 'http://localhost:4000/api/services'
+        ? `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/services/${editingId}` 
+        : `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/services`
       const method = editingId ? 'PUT' : 'POST'
 
       const res = await fetch(url, {
@@ -211,7 +211,7 @@ export function OwnerServicesPage() {
     if (!window.confirm('Are you sure you want to delete this service?')) return
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch(`http://localhost:4000/api/services/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/services/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })

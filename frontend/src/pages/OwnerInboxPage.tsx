@@ -42,7 +42,7 @@ export function OwnerInboxPage() {
 
   const fetchConversations = async () => {
     try {
-      const res = await fetch('http://localhost:4000/api/conversations/owner', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/conversations/owner`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (res.ok) {
@@ -58,7 +58,7 @@ export function OwnerInboxPage() {
   const fetchMessages = async () => {
     if (!activeConv) return
     try {
-      const res = await fetch(`http://localhost:4000/api/conversations/${activeConv.id}`)
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/conversations/${activeConv.id}`)
       if (res.ok) {
         const data = await res.json()
         setMessages(data.items || [])
@@ -70,7 +70,7 @@ export function OwnerInboxPage() {
 
   const markAsRead = async (convId: string) => {
     try {
-      await fetch(`http://localhost:4000/api/conversations/messages/read/${convId}`, {
+      await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/conversations/messages/read/${convId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ readerId: ownerId })
@@ -85,7 +85,7 @@ export function OwnerInboxPage() {
     if (!newMessage.trim() || !activeConv) return
 
     try {
-      const res = await fetch('http://localhost:4000/api/conversations/messages', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/conversations/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

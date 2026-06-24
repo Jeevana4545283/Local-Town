@@ -22,7 +22,7 @@ export function OwnerProfilePage() {
 
   const fetchProfile = async () => {
     try {
-      const res = await fetch('http://localhost:4000/api/profile', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/profile`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('lt_token')}` }
       });
       if (res.ok) {
@@ -41,7 +41,7 @@ export function OwnerProfilePage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch('http://localhost:4000/api/profile', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/profile`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -67,7 +67,7 @@ export function OwnerProfilePage() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
-        const res = await fetch('http://localhost:4000/api/profile/upload', {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/profile/upload`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -91,7 +91,7 @@ export function OwnerProfilePage() {
 
   const handleChangePassword = async () => {
     try {
-      const res = await fetch('http://localhost:4000/api/profile/password', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/profile/password`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ export function OwnerProfilePage() {
             <div className="relative mb-6">
               <div className="size-40 rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-zinc-900">
                 {profile.avatarUrl ? (
-                  <img src={`http://localhost:4000${profile.avatarUrl}`} alt="Business Logo" className="w-full h-full object-cover" />
+                  <img src={`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}${profile.avatarUrl}`} alt="Business Logo" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-5xl font-bold text-zinc-700">
                     <Briefcase size={48} />

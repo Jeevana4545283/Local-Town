@@ -70,7 +70,7 @@ export function RentalsPage() {
   });
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/rentals')
+    fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/rentals`)
       .then((res) => res.json())
       .then((data) => {
         if (data.items) {
@@ -148,7 +148,7 @@ export function RentalsPage() {
     
     setIsBooking(true);
     try {
-      const res = await fetch('http://localhost:4000/api/bookings', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

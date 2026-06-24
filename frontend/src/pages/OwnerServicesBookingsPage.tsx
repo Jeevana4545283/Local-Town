@@ -15,7 +15,7 @@ export function OwnerServicesBookingsPage() {
     try {
       // Use standard fetch since it's DEV bypass
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch('http://localhost:4000/api/services-bookings/owner', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/services-bookings/owner`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (res.ok) {
@@ -32,7 +32,7 @@ export function OwnerServicesBookingsPage() {
   const updateStatus = async (id: string, status: string) => {
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch(`http://localhost:4000/api/services-bookings/${id}/status`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/services-bookings/${id}/status`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

@@ -50,7 +50,7 @@ export function UserChatsPage() {
 
   const fetchConversations = async () => {
     try {
-      const res = await fetch(`http://localhost:4000/api/conversations/user/${userId}`)
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/conversations/user/${userId}`)
       if (res.ok) {
         const data = await res.json()
         setConversations(data.items || [])
@@ -64,7 +64,7 @@ export function UserChatsPage() {
   const fetchMessages = async () => {
     if (!activeConv) return
     try {
-      const res = await fetch(`http://localhost:4000/api/conversations/${activeConv.id}`)
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/conversations/${activeConv.id}`)
       if (res.ok) {
         const data = await res.json()
         setMessages(data.items || [])
@@ -76,7 +76,7 @@ export function UserChatsPage() {
 
   const markAsRead = async (convId: string) => {
     try {
-      await fetch(`http://localhost:4000/api/conversations/messages/read/${convId}`, {
+      await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/conversations/messages/read/${convId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ readerId: userId })
@@ -91,7 +91,7 @@ export function UserChatsPage() {
     if (!newMessage.trim() || !activeConv) return
 
     try {
-      const res = await fetch('http://localhost:4000/api/conversations/messages', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/conversations/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

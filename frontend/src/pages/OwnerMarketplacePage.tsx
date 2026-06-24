@@ -61,7 +61,7 @@ export function OwnerMarketplacePage() {
   const fetchMarketplaceItems = async () => {
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch('http://localhost:4000/api/marketplace/my', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/marketplace/my`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (res.ok) {
@@ -124,8 +124,8 @@ export function OwnerMarketplacePage() {
     try {
       const token = localStorage.getItem('lt_token') || ''
       const url = editingId 
-        ? `http://localhost:4000/api/marketplace/${editingId}` 
-        : 'http://localhost:4000/api/marketplace'
+        ? `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/marketplace/${editingId}` 
+        : `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/marketplace`
       const method = editingId ? 'PUT' : 'POST'
 
       const res = await fetch(url, {
@@ -212,7 +212,7 @@ export function OwnerMarketplacePage() {
     if (!window.confirm('Are you sure you want to delete this marketplaceItem?')) return
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch(`http://localhost:4000/api/marketplace/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/marketplace/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })

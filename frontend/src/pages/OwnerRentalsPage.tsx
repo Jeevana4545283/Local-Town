@@ -61,7 +61,7 @@ export function OwnerRentalsPage() {
   const fetchRentals = async () => {
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch('http://localhost:4000/api/rentals/my', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/rentals/my`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (res.ok) {
@@ -124,8 +124,8 @@ export function OwnerRentalsPage() {
     try {
       const token = localStorage.getItem('lt_token') || ''
       const url = editingId 
-        ? `http://localhost:4000/api/rentals/${editingId}` 
-        : 'http://localhost:4000/api/rentals'
+        ? `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/rentals/${editingId}` 
+        : `${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/rentals`
       const method = editingId ? 'PUT' : 'POST'
 
       const res = await fetch(url, {
@@ -212,7 +212,7 @@ export function OwnerRentalsPage() {
     if (!window.confirm('Are you sure you want to delete this rental?')) return
     try {
       const token = localStorage.getItem('lt_token') || ''
-      const res = await fetch(`http://localhost:4000/api/rentals/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/rentals/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })

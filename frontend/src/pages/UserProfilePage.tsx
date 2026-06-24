@@ -23,7 +23,7 @@ export function UserProfilePage() {
 
   const fetchProfile = async () => {
     try {
-      const res = await fetch('http://localhost:4000/api/profile', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/profile`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('lt_token')}` }
       });
       if (res.ok) {
@@ -45,7 +45,7 @@ export function UserProfilePage() {
 
   const fetchSavedOffers = async () => {
     try {
-      const res = await fetch('http://localhost:4000/api/offers/saved', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/offers/saved`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('lt_token')}` }
       });
       if (res.ok) {
@@ -60,7 +60,7 @@ export function UserProfilePage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch('http://localhost:4000/api/profile', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/profile`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -86,7 +86,7 @@ export function UserProfilePage() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
-        const res = await fetch('http://localhost:4000/api/profile/upload', {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/profile/upload`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -110,7 +110,7 @@ export function UserProfilePage() {
 
   const handleChangePassword = async () => {
     try {
-      const res = await fetch('http://localhost:4000/api/profile/password', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/profile/password`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -161,7 +161,7 @@ export function UserProfilePage() {
             <div className="relative mb-6">
               <div className="size-32 rounded-full overflow-hidden border-4 border-indigo-500/50 shadow-lg bg-zinc-800">
                 {profile.avatarUrl ? (
-                  <img src={`http://localhost:4000${profile.avatarUrl}`} alt="Avatar" className="w-full h-full object-cover" />
+                  <img src={`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}${profile.avatarUrl}`} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-zinc-600">
                     {profile.name?.charAt(0).toUpperCase()}

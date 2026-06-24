@@ -66,7 +66,7 @@ export function MarketplacePage() {
   });
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/marketplace')
+    fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/marketplace`)
       .then((res) => res.json())
       .then((data) => {
         if (data.items) {
@@ -123,7 +123,7 @@ export function MarketplacePage() {
     
     setIsBooking(true);
     try {
-      const res = await fetch('http://localhost:4000/api/marketplace-bookings', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/marketplace-bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
