@@ -1,11 +1,11 @@
-# LocalTown — Smart Town Community Platform (MERN)
+# LocalTown — Smart Town Community Platform
 
-Full-stack community platform built with **React + Tailwind** (frontend) and **Node.js + Express + MongoDB** (backend).
+Full-stack community platform built with **React + Tailwind** (frontend) and **Node.js + Express + MySQL (Prisma ORM)** (backend).
 
 ## Folder structure
 
 - `frontend/` React UI (Tailwind, React Router, Axios)
-- `backend/` Express API (JWT auth, Mongoose models, Socket.IO notifications)
+- `backend/` Express API (JWT auth, Prisma ORM, Socket.IO notifications)
 
 ## Quick start (local)
 
@@ -13,7 +13,7 @@ Full-stack community platform built with **React + Tailwind** (frontend) and **N
 
 Create `backend/.env` from `backend/.env.example` and set:
 
-- `MONGODB_URI`
+- `DATABASE_URL` (MySQL connection string)
 - `JWT_SECRET`
 - `CORS_ORIGIN` (default `http://localhost:5173`)
 
@@ -22,6 +22,8 @@ Run:
 ```bash
 cd backend
 npm install
+npx prisma generate
+npx prisma db push
 npm run dev
 ```
 
@@ -41,7 +43,7 @@ Open: `http://localhost:5173`
 
 ## Key features included
 
-- **Auth**: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/auth/me`
+- **Auth**: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/auth/me` (Single-Identity Architecture)
 - **Rentals**: CRUD + text search (`/api/rentals`)
 - **Workers**: profiles + admin verify (`/api/workers`)
 - **Offers / Events / Alerts**: admin create + user feed (`/api/offers`, `/api/events`, `/api/alerts`)
@@ -55,4 +57,3 @@ Open: `http://localhost:5173`
   - Stripe intent: `POST /api/payments/stripe/intent` (requires `STRIPE_SECRET_KEY`)
   - QR code payments (UPI URL + QR data URL): `POST /api/payments/qr`
 - **AI assistant**: `POST /api/ai/chat` (local smart-search based recommendations)
-
